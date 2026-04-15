@@ -76,3 +76,47 @@
 - 现存风险：
   - 当前是响应式横向滚动表格，超窄屏可用性优先于完全无滚动
   - 模板管理页的动态编辑区尚未切换到同一套表格式结构
+
+## UI 回归 2026-04-15 16:22 CST
+
+- 状态：已完成
+- 目标：统一自定义选择器与手动预览交互，继续收口表格空态和图标按钮
+- 变更：
+  - 原生 `select` 已替换为自定义下拉组件，并同步用于模板页
+  - Rule Provider 的 `Behavior` 改为 autocomplete，内置 `domain`、`ipcidr`、`classical`，同时保留任意输入
+  - 表格 0 行时仅显示居中的“添加”按钮，添加按钮改为图标 + 文字，删除改为 icon button
+  - 配置器取消实时预览，改为手动点击预览并在 dialog 中查看结果
+  - 配置器页面改回单列布局
+- 测试：
+  - `bun run build:frontend`
+  - `bun run test`
+- 结果：
+  - 前端构建通过，`public/assets` 已更新
+  - 4 个测试文件通过
+  - 15 个测试用例通过
+- 现存风险：
+  - 自定义下拉当前以鼠标与基础键盘关闭为主，尚未补完整的方向键导航
+  - 模板管理页仍未统一到与配置器一致的弱卡片单列语言
+
+## 开发链路回归 2026-04-15 16:37 CST
+
+- 状态：已完成
+- 目标：将本地开发入口切换为 `Vite + @cloudflare/vite-plugin`，让 Worker 继续作为统一入口并支持前端 HMR
+- 变更：
+  - 根脚本 `bun run dev` 改为启动 `frontend` 下的 Vite 开发服务器
+  - `frontend/vite.config.js` 在 `serve` 模式下接入 `@cloudflare/vite-plugin`
+  - 生产构建保持原先 `public/` 产物输出，不让 Cloudflare 插件接管 `vite build`
+- 测试：
+  - `bun install`
+  - `bun run build:frontend`
+  - `timeout 10s bun run dev`
+  - `bun run test`
+- 结果：
+  - 依赖安装成功，`bun.lock` 已更新
+  - 前端构建通过，继续输出到 `public/index.html` 与 `public/assets/*`
+  - `bun run dev` 可成功启动统一入口开发服务器
+  - 4 个测试文件通过
+  - 15 个测试用例通过
+- 现存风险：
+  - 若 `8787` 端口已被占用，Vite 会自动切换到下一个空闲端口
+  - 当前仅在开发模式启用 Cloudflare Vite 插件，生产发布仍依赖现有 Wrangler + `public/` 目录流程

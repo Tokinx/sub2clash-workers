@@ -26,3 +26,5 @@
 - API 路由已按认证与业务边界拆分
 - 内置模板由 `public/templates/` 静态托管
 - 前端构建产物输出到 `public/`，Worker 直接托管
+- 本地开发入口切换为 `frontend/vite.config.js` + `@cloudflare/vite-plugin`
+- 开发时由 Vite 驱动 HMR，Worker 仍作为统一入口处理静态资源与动态接口

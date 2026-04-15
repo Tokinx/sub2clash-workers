@@ -6,7 +6,7 @@
     "frontend"
   ],
   "scripts": {
-    "dev": "bun run build:frontend && wrangler dev --config wrangler.local.jsonc",
+    "dev": "cd frontend && bun run dev",
     "dev:worker": "wrangler dev --config wrangler.local.jsonc",
     "dev:frontend": "cd frontend && bun run dev",
     "build": "bun run build:frontend",
