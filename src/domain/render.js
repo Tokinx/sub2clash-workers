@@ -28,6 +28,10 @@ async function loadTemplate(env, request, config) {
 }
 
 function ensureTemplateShape(templateObject) {
+  if (!templateObject || typeof templateObject !== "object" || Array.isArray(templateObject)) {
+    throw unprocessable("模板 YAML 顶层必须是对象");
+  }
+
   return {
     ...templateObject,
     proxies: Array.isArray(templateObject.proxies) ? templateObject.proxies : [],

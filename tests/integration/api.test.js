@@ -61,6 +61,7 @@ describe("worker api", () => {
           "content-type": "application/json"
         },
         body: JSON.stringify({
+          customId: "manual-id",
           config: {
             target: "meta",
             sources: {
@@ -99,6 +100,8 @@ describe("worker api", () => {
 
     expect(linkResponse.status).toBe(201);
     const link = await linkResponse.json();
+    expect(link.id).not.toBe("manual-id");
+    expect(link.id).toHaveLength(20);
 
     const renderResponse = await app.request(
       "https://app.example.com/s/" + link.id,

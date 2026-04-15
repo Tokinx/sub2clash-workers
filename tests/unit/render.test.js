@@ -102,4 +102,54 @@ describe("renderConfig", () => {
     expect(result.yaml).not.toContain("MetaOnly");
     expect(result.stats.proxyCount).toBe(1);
   });
+
+  it("内置模板不应被 ASSETS 的 SPA fallback 污染", async () => {
+    const env = createEnv({
+      ASSETS: {
+        async fetch() {
+          return new Response("<!doctype html><html><body>index</body></html>", {
+            headers: {
+              "content-type": "text/html; charset=utf-8"
+            }
+          });
+        }
+      }
+    });
+
+    const result = await renderConfig(env, new Request("https://app.example.com/sub/demo"), {
+      target: "meta",
+      sources: {
+        subscriptions: [],
+        nodes: [
+          "ss://YWVzLTI1Ni1nY206cGFzc0BleGFtcGxlLmNvbTo4NDQz#BuiltinSafe"
+        ]
+      },
+      template: {
+        mode: "builtin",
+        value: "meta-default"
+      },
+      routing: {
+        ruleProviders: [],
+        rules: []
+      },
+      transforms: {
+        filterRegex: "",
+        replacements: []
+      },
+      options: {
+        sort: "nameasc",
+        autoTest: false,
+        lazy: false,
+        refresh: false,
+        nodeList: false,
+        ignoreCountryGroup: false,
+        userAgent: "tester",
+        useUDP: false
+      }
+    });
+
+    expect(result.yaml).toContain("BuiltinSafe");
+    expect(result.yaml).toContain("proxy-groups:");
+    expect(result.yaml).not.toContain("<!doctype html>");
+  });
 });

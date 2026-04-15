@@ -1,15 +1,38 @@
 import { useEffect, useMemo, useState } from "react";
 
-import { Input, Select, Textarea, Toggle } from "../components/Fields.jsx";
+import { Button } from "../components/Button.jsx";
+import { Autocomplete, Input, Select, Textarea, Toggle } from "../components/Fields.jsx";
+import PreviewDialog from "../components/dashboard/PreviewDialog.jsx";
 import { apiFetch } from "../lib/api.js";
 import { createEmptyConfig, decodeConfigPayload, encodeConfigPayload } from "../lib/config.js";
+import { cn } from "../lib/cn.js";
 
 const LONG_LINK_SOFT_LIMIT = 15_500;
+const RULE_PROVIDER_BEHAVIOR_OPTIONS = [
+  { value: "classical", label: "classical" },
+  { value: "domain", label: "domain" },
+  { value: "ipcidr", label: "ipcidr" },
+];
 
-const primaryButtonClass = "btn btn-primary";
-const secondaryButtonClass = "btn btn-secondary";
-const dangerButtonClass = "btn btn-danger";
-const subtleButtonClass = "btn btn-subtle";
+function createEmptyReplacement() {
+  return { pattern: "", replacement: "" };
+}
+
+function createEmptyRuleProvider() {
+  return { name: "", group: "", behavior: "", url: "", prepend: false };
+}
+
+function createEmptyRule() {
+  return { value: "", prepend: false };
+}
+
+function createEmptySubscription() {
+  return { url: "", prefix: "" };
+}
+
+function ensureTableRow(items, createItem) {
+  return items.length ? items : [createItem()];
+}
 
 function cleanSubscriptions(items) {
   return items.filter((item) => item.url.trim());
@@ -22,34 +45,99 @@ function normalizeNodes(text) {
     .filter(Boolean);
 }
 
+function PlusIcon() {
+  return (
+    <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" aria-hidden="true">
+      <path d="M8 3.25v9.5M3.25 8h9.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" aria-hidden="true">
+      <path
+        d="M3.5 4.25h9M6.25 2.75h3.5M5 4.25v7m3-7v7m3-7v7M4.25 4.25l.4 8.12c.03.66.58 1.18 1.24 1.18h4.22c.66 0 1.21-.52 1.24-1.18l.4-8.12"
+        stroke="currentColor"
+        strokeWidth="1.35"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function EyeIcon() {
+  return (
+    <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" aria-hidden="true">
+      <path
+        d="M1.5 8s2.3-4 6.5-4 6.5 4 6.5 4-2.3 4-6.5 4S1.5 8 1.5 8Z"
+        stroke="currentColor"
+        strokeWidth="1.3"
+        strokeLinejoin="round"
+      />
+      <circle cx="8" cy="8" r="2" stroke="currentColor" strokeWidth="1.3" />
+    </svg>
+  );
+}
+
+function LinkIcon() {
+  return (
+    <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" aria-hidden="true">
+      <path
+        d="M6.25 9.75 4.5 11.5a2.47 2.47 0 1 1-3.5-3.5L2.75 6.25M9.75 6.25 11.5 4.5a2.47 2.47 0 0 1 3.5 3.5l-1.75 1.75M5.25 10.75l5.5-5.5"
+        stroke="currentColor"
+        strokeWidth="1.35"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function RefreshIcon() {
+  return (
+    <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" aria-hidden="true">
+      <path
+        d="M13.25 4.5V1.75M13.25 1.75H10.5M13.25 1.75 10.4 4.6M2.75 11.5v2.75M2.75 14.25H5.5M2.75 14.25l2.85-2.85M4.2 5.15A5 5 0 0 1 13 7M3 9a5 5 0 0 0 8.8 1.85"
+        stroke="currentColor"
+        strokeWidth="1.3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function SearchIcon() {
+  return (
+    <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" aria-hidden="true">
+      <path
+        d="M7 12.25a5.25 5.25 0 1 0 0-10.5 5.25 5.25 0 0 0 0 10.5ZM10.75 10.75 14 14"
+        stroke="currentColor"
+        strokeWidth="1.3"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 function SectionHeading({ eyebrow, title, description }) {
   return (
     <div className="mb-5">
       {eyebrow ? (
-        <p className="mb-2 text-[0.72rem] uppercase tracking-[0.18em] text-[var(--stone)]">
-          {eyebrow}
-        </p>
+        <p className="mb-2 text-[0.72rem] uppercase tracking-[0.18em] text-[var(--stone)]">{eyebrow}</p>
       ) : null}
-      <h2 className="font-display text-[1.55rem] leading-[1.08] md:text-[1.9rem]">
-        {title}
-      </h2>
-      {description ? (
-        <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--muted)]">
-          {description}
-        </p>
-      ) : null}
+      <h2 className="font-display text-[1.55rem] leading-[1.08] md:text-[1.9rem]">{title}</h2>
+      {description ? <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--muted)]">{description}</p> : null}
     </div>
   );
 }
 
 function EditorSection({ eyebrow, title, description, children }) {
   return (
-    <section className="panel-section">
-      <SectionHeading
-        eyebrow={eyebrow}
-        title={title}
-        description={description}
-      />
+    <section className="pt-6">
+      <SectionHeading eyebrow={eyebrow} title={title} description={description} />
       {children}
     </section>
   );
@@ -63,26 +151,48 @@ function TableTextInput({ value, onChange, placeholder, ariaLabel }) {
       onChange={(event) => onChange(event.target.value)}
       placeholder={placeholder}
       aria-label={ariaLabel}
-      className="field-input"
+      className="h-[var(--control-height)] min-h-[var(--control-height)] w-full rounded-[0.72rem] border border-[var(--border)] bg-[rgba(255,255,255,0.88)] px-[0.92rem] text-[0.95rem] leading-[1.5] text-[var(--ink)] outline-none transition-[border-color,box-shadow,transform] duration-200 focus-visible:border-[rgba(201,100,66,0.55)] focus-visible:shadow-[0_0_0_3px_rgba(201,100,66,0.12)]"
     />
+  );
+}
+
+function IconButton({ label, onClick, tone = "subtle", disabled = false, className = "", children }) {
+  // if(children) children.className = "h-4 w-4";
+  children = { ...children, props: { ...children.props, className: "h-6 w-6 flex-shrink-0" } };
+  return (
+    <Button
+      aria-label={label}
+      onClick={onClick}
+      disabled={disabled}
+      variant={tone === "danger" ? "danger" : "subtle"}
+      size="icon"
+      className={className}
+    >
+      {children}
+    </Button>
+  );
+}
+
+function AddRowButton({ label, onClick, className = "" }) {
+  return (
+    <div className="flex justify-center">
+      <Button variant="secondary" className={className} onClick={onClick}>
+        <PlusIcon />
+        <span>{label}</span>
+      </Button>
+    </div>
   );
 }
 
 function EditorTable({ columnsClassName, minWidthClassName, headers, children }) {
   return (
-    <div className="editor-table overflow-x-auto">
-      <div className={minWidthClassName}>
-        <div className={`editor-table-head ${columnsClassName}`}>
+    <div className="rounded-[0.76rem] border border-[var(--border)] bg-[rgba(255,255,255,0.34)] px-3 py-1.5">
+      <div className={cn("overflow-auto pt-1.5")}>
+        <div className={`mb-1 grid ${columnsClassName}`}>
           {headers.map((header) => (
             <p
               key={header}
-              className={
-                header === "操作"
-                  ? "text-right"
-                  : header === "前置"
-                    ? "text-center"
-                    : ""
-              }
+              className={`m-0 text-[0.72rem] uppercase text-[var(--stone)] ${header === "操作" || header === "前置" ? "text-center" : ""}`}
             >
               {header}
             </p>
@@ -95,31 +205,29 @@ function EditorTable({ columnsClassName, minWidthClassName, headers, children })
 }
 
 function EditorTableRow({ columnsClassName, children }) {
-  return <div className={`editor-table-row ${columnsClassName}`}>{children}</div>;
+  return <div className={`grid items-center gap-3 py-1.5 ${columnsClassName}`}>{children}</div>;
 }
 
 function ReplacementEditor({ replacements, onChange }) {
-  const columnsClassName =
-    "grid grid-cols-[minmax(16rem,1fr)_minmax(16rem,1fr)_5.5rem] gap-3";
+  const columnsClassName = "grid grid-cols-[minmax(16rem,1fr)_minmax(16rem,1fr)_3rem] gap-3";
+  const rows = ensureTableRow(replacements, createEmptyReplacement);
+  const canDelete = rows.length > 1;
 
   return (
-    <div>
+    <div className="space-y-3">
       <EditorTable
         headers={["匹配正则", "替换文本", "操作"]}
         columnsClassName={columnsClassName}
-        minWidthClassName="min-w-[38rem]"
+        minWidthClassName="min-w-[37rem]"
       >
-        {replacements.map((item, index) => (
-          <EditorTableRow
-            key={`${item.pattern}-${index}`}
-            columnsClassName={columnsClassName}
-          >
+        {rows.map((item, index) => (
+          <EditorTableRow key={`${item.pattern}-${index}`} columnsClassName={columnsClassName}>
             <TableTextInput
               value={item.pattern}
               ariaLabel="匹配正则"
-              placeholder="例如：香港|HK"
+              placeholder="香港|HK"
               onChange={(value) => {
-                const next = [...replacements];
+                const next = [...rows];
                 next[index] = { ...next[index], pattern: value };
                 onChange(next);
               }}
@@ -127,63 +235,55 @@ function ReplacementEditor({ replacements, onChange }) {
             <TableTextInput
               value={item.replacement}
               ariaLabel="替换文本"
-              placeholder="例如：Hong Kong"
+              placeholder="Hong Kong"
               onChange={(value) => {
-                const next = [...replacements];
+                const next = [...rows];
                 next[index] = { ...next[index], replacement: value };
                 onChange(next);
               }}
             />
-            <div className="flex justify-end">
-              <button
-                type="button"
-                className={subtleButtonClass}
-                onClick={() =>
-                  onChange(replacements.filter((_, itemIndex) => itemIndex !== index))
-                }
+            <div className="flex justify-center">
+              <IconButton
+                label="删除替换规则"
+                disabled={!canDelete}
+                onClick={() => {
+                  if (!canDelete) return;
+                  onChange(rows.filter((_, itemIndex) => itemIndex !== index));
+                }}
+                tone="danger"
               >
-                删除
-              </button>
+                <TrashIcon />
+              </IconButton>
             </div>
           </EditorTableRow>
         ))}
       </EditorTable>
 
-      <div className="mt-3 flex justify-end">
-        <button
-          type="button"
-          className={secondaryButtonClass}
-          onClick={() => onChange([...replacements, { pattern: "", replacement: "" }])}
-        >
-          新增替换规则
-        </button>
-      </div>
+      <AddRowButton label="新增规则" onClick={() => onChange([...rows, createEmptyReplacement()])} />
     </div>
   );
 }
 
 function RuleProviderEditor({ providers, onChange }) {
-  const columnsClassName =
-    "grid grid-cols-[10rem_10rem_7rem_minmax(18rem,1fr)_6.5rem_5.5rem] gap-3";
+  const columnsClassName = "grid grid-cols-[9rem_10rem_minmax(11rem,0.8fr)_minmax(18rem,1fr)_5rem_3rem] gap-3";
+  const rows = ensureTableRow(providers, createEmptyRuleProvider);
+  const canDelete = rows.length > 1;
 
   return (
-    <div>
+    <div className="space-y-3">
       <EditorTable
         headers={["名称", "策略组", "行为", "URL", "前置", "操作"]}
         columnsClassName={columnsClassName}
-        minWidthClassName="min-w-[52rem]"
+        minWidthClassName="min-w-[55rem]"
       >
-        {providers.map((item, index) => (
-          <EditorTableRow
-            key={`${item.name}-${index}`}
-            columnsClassName={columnsClassName}
-          >
+        {rows.map((item, index) => (
+          <EditorTableRow key={`${item.name}-${index}`} columnsClassName={columnsClassName}>
             <TableTextInput
               value={item.name}
               ariaLabel="名称"
-              placeholder="例如：direct"
+              placeholder="streaming"
               onChange={(value) => {
-                const next = [...providers];
+                const next = [...rows];
                 next[index] = { ...next[index], name: value };
                 onChange(next);
               }}
@@ -191,29 +291,30 @@ function RuleProviderEditor({ providers, onChange }) {
             <TableTextInput
               value={item.group}
               ariaLabel="策略组"
-              placeholder="例如：节点选择"
+              placeholder="节点选择"
               onChange={(value) => {
-                const next = [...providers];
+                const next = [...rows];
                 next[index] = { ...next[index], group: value };
                 onChange(next);
               }}
             />
-            <TableTextInput
+            <Autocomplete
               value={item.behavior}
-              ariaLabel="行为"
-              placeholder="例如：domain"
               onChange={(value) => {
-                const next = [...providers];
+                const next = [...rows];
                 next[index] = { ...next[index], behavior: value };
                 onChange(next);
               }}
+              options={RULE_PROVIDER_BEHAVIOR_OPTIONS}
+              placeholder="选择或输入行为"
+              ariaLabel="行为"
             />
             <TableTextInput
               value={item.url}
               ariaLabel="URL"
               placeholder="https://example.com/provider.yaml"
               onChange={(value) => {
-                const next = [...providers];
+                const next = [...rows];
                 next[index] = { ...next[index], url: value };
                 onChange(next);
               }}
@@ -224,64 +325,56 @@ function RuleProviderEditor({ providers, onChange }) {
                 checked={Boolean(item.prepend)}
                 compact
                 onChange={(value) => {
-                  const next = [...providers];
+                  const next = [...rows];
                   next[index] = { ...next[index], prepend: value };
                   onChange(next);
                 }}
               />
             </div>
-            <div className="flex justify-end">
-              <button
-                type="button"
-                className={subtleButtonClass}
-                onClick={() => onChange(providers.filter((_, itemIndex) => itemIndex !== index))}
+            <div className="flex justify-center">
+              <IconButton
+                label="删除订阅规则"
+                disabled={!canDelete}
+                onClick={() => {
+                  if (!canDelete) {
+                    return;
+                  }
+                  onChange(rows.filter((_, itemIndex) => itemIndex !== index));
+                }}
+                tone="danger"
               >
-                删除
-              </button>
+                <TrashIcon />
+              </IconButton>
             </div>
           </EditorTableRow>
         ))}
       </EditorTable>
 
-      <div className="mt-3 flex justify-end">
-        <button
-          type="button"
-          className={secondaryButtonClass}
-          onClick={() =>
-            onChange([
-              ...providers,
-              { name: "", group: "节点选择", behavior: "domain", url: "", prepend: false }
-            ])
-          }
-        >
-          新增 Rule Provider
-        </button>
-      </div>
+      <AddRowButton label="订阅规则" onClick={() => onChange([...rows, createEmptyRuleProvider()])} />
     </div>
   );
 }
 
 function RulesEditor({ rules, onChange }) {
-  const columnsClassName = "grid grid-cols-[minmax(24rem,1fr)_6.5rem_5.5rem] gap-3";
+  const columnsClassName = "grid grid-cols-[minmax(24rem,1fr)_5rem_3rem] gap-3";
+  const rows = ensureTableRow(rules, createEmptyRule);
+  const canDelete = rows.length > 1;
 
   return (
-    <div>
+    <div className="space-y-3">
       <EditorTable
         headers={["规则", "前置", "操作"]}
         columnsClassName={columnsClassName}
-        minWidthClassName="min-w-[38rem]"
+        minWidthClassName="min-w-[36rem]"
       >
-        {rules.map((item, index) => (
-          <EditorTableRow
-            key={`${item.value}-${index}`}
-            columnsClassName={columnsClassName}
-          >
+        {rows.map((item, index) => (
+          <EditorTableRow key={`${item.value}-${index}`} columnsClassName={columnsClassName}>
             <TableTextInput
               value={item.value}
               ariaLabel="规则"
-              placeholder="例如：DOMAIN-SUFFIX,openai.com,DIRECT"
+              placeholder="DOMAIN-SUFFIX,openai.com,DIRECT"
               onChange={(value) => {
-                const next = [...rules];
+                const next = [...rows];
                 next[index] = { ...next[index], value };
                 onChange(next);
               }}
@@ -292,59 +385,56 @@ function RulesEditor({ rules, onChange }) {
                 checked={Boolean(item.prepend)}
                 compact
                 onChange={(value) => {
-                  const next = [...rules];
+                  const next = [...rows];
                   next[index] = { ...next[index], prepend: value };
                   onChange(next);
                 }}
               />
             </div>
-            <div className="flex justify-end">
-              <button
-                type="button"
-                className={subtleButtonClass}
-                onClick={() => onChange(rules.filter((_, itemIndex) => itemIndex !== index))}
+            <div className="flex justify-center">
+              <IconButton
+                label="删除规则"
+                disabled={!canDelete}
+                onClick={() => {
+                  if (!canDelete) {
+                    return;
+                  }
+                  onChange(rows.filter((_, itemIndex) => itemIndex !== index));
+                }}
+                tone="danger"
               >
-                删除
-              </button>
+                <TrashIcon />
+              </IconButton>
             </div>
           </EditorTableRow>
         ))}
       </EditorTable>
 
-      <div className="mt-3 flex justify-end">
-        <button
-          type="button"
-          className={secondaryButtonClass}
-          onClick={() => onChange([...rules, { value: "", prepend: false }])}
-        >
-          新增规则
-        </button>
-      </div>
+      <AddRowButton label="新增规则" onClick={() => onChange([...rows, createEmptyRule()])} />
     </div>
   );
 }
 
 function SubscriptionEditor({ subscriptions, onChange }) {
-  const columnsClassName = "grid grid-cols-[minmax(24rem,1fr)_12rem_5.5rem] gap-3";
+  const columnsClassName = "grid grid-cols-[minmax(24rem,1fr)_12rem_3rem] gap-3";
+  const rows = ensureTableRow(subscriptions, createEmptySubscription);
+  const canDelete = rows.length > 1;
 
   return (
-    <div>
+    <div className="space-y-3">
       <EditorTable
         headers={["订阅地址", "节点前缀", "操作"]}
         columnsClassName={columnsClassName}
-        minWidthClassName="min-w-[42rem]"
+        minWidthClassName="min-w-[40rem]"
       >
-        {subscriptions.map((item, index) => (
-          <EditorTableRow
-            key={`${item.url}-${index}`}
-            columnsClassName={columnsClassName}
-          >
+        {rows.map((item, index) => (
+          <EditorTableRow key={`${item.url}-${index}`} columnsClassName={columnsClassName}>
             <TableTextInput
               value={item.url}
               ariaLabel="订阅地址"
               placeholder="https://example.com/subscription"
               onChange={(value) => {
-                const next = [...subscriptions];
+                const next = [...rows];
                 next[index] = { ...next[index], url: value };
                 onChange(next);
               }}
@@ -352,96 +442,34 @@ function SubscriptionEditor({ subscriptions, onChange }) {
             <TableTextInput
               value={item.prefix}
               ariaLabel="节点前缀"
-              placeholder="例如：机场 A"
+              placeholder="Subscribe A"
               onChange={(value) => {
-                const next = [...subscriptions];
+                const next = [...rows];
                 next[index] = { ...next[index], prefix: value };
                 onChange(next);
               }}
             />
-            <div className="flex justify-end">
-              <button
-                type="button"
-                className={subtleButtonClass}
-                onClick={() => onChange(subscriptions.filter((_, itemIndex) => itemIndex !== index))}
+            <div className="flex justify-center">
+              <IconButton
+                label="删除订阅"
+                disabled={!canDelete}
+                onClick={() => {
+                  if (!canDelete) {
+                    return;
+                  }
+                  onChange(rows.filter((_, itemIndex) => itemIndex !== index));
+                }}
+                tone="danger"
               >
-                删除
-              </button>
+                <TrashIcon />
+              </IconButton>
             </div>
           </EditorTableRow>
         ))}
       </EditorTable>
 
-      <div className="mt-3 flex justify-end">
-        <button
-          type="button"
-          className={secondaryButtonClass}
-          onClick={() => onChange([...subscriptions, { url: "", prefix: "" }])}
-        >
-          新增订阅
-        </button>
-      </div>
+      <AddRowButton label="新增订阅" onClick={() => onChange([...rows, createEmptySubscription()])} />
     </div>
-  );
-}
-
-function PreviewPanel({ preview, stats, warnings, renderError, subscriptionInfo }) {
-  return (
-    <aside className="surface-panel-dark overflow-hidden lg:sticky lg:top-[5.3rem] lg:h-[calc(100vh-6.8rem)]">
-      <div className="flex h-full flex-col p-5 md:p-6">
-        <SectionHeading
-          eyebrow="Preview"
-          title="实时输出"
-          description="渲染结果直接来自 Worker API，不依赖浏览器本地拼装。"
-        />
-
-        {stats ? (
-          <div className="grid gap-3 sm:grid-cols-3">
-            {[
-              ["节点", stats.proxyCount],
-              ["国家组", stats.countryGroupCount],
-              ["模板", stats.templateId]
-            ].map(([label, value]) => (
-              <div
-                key={label}
-                className="metric-chip-dark"
-              >
-                <p className="text-[0.68rem] uppercase tracking-[0.16em] text-[var(--silver)]">
-                  {label}
-                </p>
-                <p className="mt-2 font-display text-[1.45rem] leading-none text-[var(--ivory)]">
-                  {value}
-                </p>
-              </div>
-            ))}
-          </div>
-        ) : null}
-
-        <div className="mt-4 space-y-3">
-          {subscriptionInfo ? (
-            <p className="notice-panel-dark text-xs text-[var(--silver)]">
-              subscription-userinfo: {subscriptionInfo}
-            </p>
-          ) : null}
-          {warnings.length ? (
-            <ul className="notice-panel-dark text-sm text-[var(--silver)]">
-              {warnings.map((warning) => (
-                <li key={warning}>{warning}</li>
-              ))}
-            </ul>
-          ) : null}
-          {renderError ? (
-            <p className="rounded-[0.72rem] bg-[rgba(201,100,66,0.18)] px-4 py-3 text-sm text-[#ffe9e1]">
-              {renderError}
-            </p>
-          ) : null}
-        </div>
-
-        <pre className="mt-4 min-h-[18rem] flex-1 overflow-auto rounded-[0.78rem] border border-[var(--dark-border)] bg-[rgba(0,0,0,0.16)] p-4 text-xs leading-6 text-[var(--ivory)]">
-          {preview || "等待渲染结果..."}
-        </pre>
-      </div>
-    </aside>
   );
 }
 
@@ -451,20 +479,22 @@ export default function DashboardPage({ templates }) {
   const [preview, setPreview] = useState("");
   const [stats, setStats] = useState(null);
   const [warnings, setWarnings] = useState([]);
-  const [renderError, setRenderError] = useState("");
+  const [pageError, setPageError] = useState("");
+  const [previewError, setPreviewError] = useState("");
   const [linkInput, setLinkInput] = useState("");
   const [shortLinkId, setShortLinkId] = useState("");
-  const [customShortId, setCustomShortId] = useState("");
   const [subscriptionInfo, setSubscriptionInfo] = useState("");
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   const templateOptions = useMemo(() => {
     const builtin = templates.builtin.map((item) => ({
       value: `builtin:${item.id}`,
-      label: `${item.name} / ${item.target}`
+      label: `${item.name} / ${item.target}`,
     }));
     const custom = templates.custom.map((item) => ({
       value: `custom:${item.id}`,
-      label: `${item.name} / ${item.target}`
+      label: `${item.name} / ${item.target}`,
     }));
     return [...builtin, ...custom];
   }, [templates]);
@@ -475,50 +505,25 @@ export default function DashboardPage({ templates }) {
       sources: {
         ...config.sources,
         subscriptions: cleanSubscriptions(config.sources.subscriptions),
-        nodes: normalizeNodes(nodesText)
-      }
+        nodes: normalizeNodes(nodesText),
+      },
     }),
-    [config, nodesText]
+    [config, nodesText],
   );
 
   const longLink = useMemo(
     () => `${window.location.origin}/sub/${encodeConfigPayload(effectiveConfig)}`,
-    [effectiveConfig]
+    [effectiveConfig],
   );
 
   const canCopyLongLink = longLink.length < LONG_LINK_SOFT_LIMIT;
-
-  async function renderCurrentConfig() {
-    try {
-      const data = await apiFetch("/api/render", {
-        method: "POST",
-        body: JSON.stringify(effectiveConfig)
-      });
-      setPreview(data.yaml);
-      setStats(data.stats);
-      setWarnings(data.warnings || []);
-      setRenderError("");
-      setSubscriptionInfo(data.subscriptionUserinfo || "");
-    } catch (error) {
-      setRenderError(error.message);
-      setPreview("");
-      setStats(null);
-    }
-  }
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      renderCurrentConfig();
-    }, 350);
-    return () => clearTimeout(timer);
-  }, [effectiveConfig]);
 
   useEffect(() => {
     if (!templateOptions.length) {
       return;
     }
     const available = templateOptions.some(
-      (option) => option.value === `${config.template.mode}:${config.template.value}`
+      (option) => option.value === `${config.template.mode}:${config.template.value}`,
     );
     if (!available) {
       const fallback = templateOptions[0].value.split(":");
@@ -526,8 +531,8 @@ export default function DashboardPage({ templates }) {
         ...current,
         template: {
           mode: fallback[0],
-          value: fallback[1]
-        }
+          value: fallback[1],
+        },
       }));
     }
   }, [templateOptions]);
@@ -538,16 +543,34 @@ export default function DashboardPage({ templates }) {
       ...current,
       template: {
         mode,
-        value: templateId
-      }
+        value: templateId,
+      },
     }));
   }
 
-  async function copyLongLink() {
-    if (!canCopyLongLink) {
-      return;
+  async function renderCurrentConfig() {
+    setPreviewLoading(true);
+    setPreviewError("");
+    setPreviewOpen(true);
+
+    try {
+      const data = await apiFetch("/api/render", {
+        method: "POST",
+        body: JSON.stringify(effectiveConfig),
+      });
+      setPreview(data.yaml);
+      setStats(data.stats);
+      setWarnings(data.warnings || []);
+      setSubscriptionInfo(data.subscriptionUserinfo || "");
+    } catch (error) {
+      setPreview("");
+      setStats(null);
+      setWarnings([]);
+      setSubscriptionInfo("");
+      setPreviewError(error.message || "预览失败");
+    } finally {
+      setPreviewLoading(false);
     }
-    await navigator.clipboard.writeText(longLink);
   }
 
   async function importLink() {
@@ -558,7 +581,8 @@ export default function DashboardPage({ templates }) {
         const nextConfig = decodeConfigPayload(payload);
         setConfig(nextConfig);
         setNodesText((nextConfig.sources?.nodes || []).join("\n"));
-        setRenderError("");
+        setShortLinkId("");
+        setPageError("");
         return;
       }
       if (url.pathname.startsWith("/s/")) {
@@ -567,91 +591,89 @@ export default function DashboardPage({ templates }) {
         setConfig(data.config);
         setNodesText((data.config.sources?.nodes || []).join("\n"));
         setShortLinkId(data.id);
-        setRenderError("");
+        setPageError("");
         return;
       }
-      setRenderError("暂不支持该链接格式");
+      setPageError("暂不支持该链接格式。");
     } catch (error) {
-      setRenderError(error.message || "导入失败");
+      setPageError(error.message || "导入失败。");
     }
   }
 
   async function createShortLink() {
-    const data = await apiFetch("/api/links", {
-      method: "POST",
-      body: JSON.stringify({
-        config: effectiveConfig,
-        customId: customShortId || undefined
-      })
-    });
-    setShortLinkId(data.id);
+    try {
+      const data = await apiFetch("/api/links", {
+        method: "POST",
+        body: JSON.stringify({
+          config: effectiveConfig,
+        }),
+      });
+      setShortLinkId(data.id);
+      setPageError("");
+    } catch (error) {
+      setPageError(error.message || "生成短链接失败。");
+    }
   }
 
   async function updateShortLink() {
     if (!shortLinkId) {
       return;
     }
-    await apiFetch(`/api/links/${shortLinkId}`, {
-      method: "PUT",
-      body: JSON.stringify({ config: effectiveConfig })
-    });
+
+    try {
+      await apiFetch(`/api/links/${shortLinkId}`, {
+        method: "PUT",
+        body: JSON.stringify({ config: effectiveConfig }),
+      });
+      setPageError("");
+    } catch (error) {
+      setPageError(error.message || "更新短链接失败。");
+    }
   }
 
   async function removeShortLink() {
     if (!shortLinkId) {
       return;
     }
-    await apiFetch(`/api/links/${shortLinkId}`, {
-      method: "DELETE",
-      body: JSON.stringify({})
-    });
-    setShortLinkId("");
+
+    try {
+      await apiFetch(`/api/links/${shortLinkId}`, {
+        method: "DELETE",
+        body: JSON.stringify({}),
+      });
+      setShortLinkId("");
+      setPageError("");
+    } catch (error) {
+      setPageError(error.message || "删除短链接失败。");
+    }
   }
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-start">
-      <div className="surface-panel p-5 md:p-6 lg:min-h-[calc(100vh-6.8rem)]">
+    <>
+      <div className="max-w-6xl mx-auto">
         <div className="space-y-6">
           <section>
             <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
-              <div className="min-w-0">
-                <label className="field">
-                  <span className="field-label">导入长链接 / 短链接</span>
-                  <input
-                    type="text"
-                    value={linkInput}
-                    onChange={(event) => setLinkInput(event.target.value)}
-                    placeholder="粘贴 /sub/... 或 /s/... 链接"
-                    className="field-input"
-                  />
-                </label>
+              <Input
+                className="min-w-0"
+                label="Links"
+                value={linkInput}
+                onChange={setLinkInput}
+                placeholder="粘贴 /sub/... 或 /s/... 链接"
+              />
+              <div className="flex flex-wrap gap-3">
+                <Button variant="primary" onClick={importLink}>
+                  <SearchIcon />
+                  <span>解析</span>
+                </Button>
               </div>
-              <button
-                type="button"
-                onClick={importLink}
-                className={`${primaryButtonClass} lg:min-w-[7rem]`}
-              >
-                解析
-              </button>
             </div>
 
-            <div className="mt-4 grid gap-3 sm:grid-cols-3">
-              {[
-                ["目标格式", config.target === "meta" ? "Clash.Meta" : "Clash"],
-                ["当前模板", `${config.template.mode}:${config.template.value}`],
-                ["长链接长度", `${longLink.length} 字符`]
-              ].map(([label, value]) => (
-                <div
-                  key={label}
-                  className="metric-chip"
-                >
-                  <p className="text-[0.68rem] uppercase tracking-[0.16em] text-[var(--stone)]">
-                    {label}
-                  </p>
-                  <p className="mt-2 font-display text-[1.35rem] leading-none">{value}</p>
-                </div>
-              ))}
-            </div>
+            {pageError ? (
+              <p className="mt-4 rounded-[0.72rem] border border-[var(--border)] bg-[rgba(255,255,255,0.3)] px-4 py-3 text-sm text-[var(--error)]">
+                {pageError}
+              </p>
+            ) : null}
           </section>
 
           <EditorSection
@@ -666,8 +688,8 @@ export default function DashboardPage({ templates }) {
                   ...current,
                   sources: {
                     ...current.sources,
-                    subscriptions
-                  }
+                    subscriptions,
+                  },
                 }))
               }
             />
@@ -678,23 +700,19 @@ export default function DashboardPage({ templates }) {
               value={nodesText}
               onChange={setNodesText}
               rows={7}
-              placeholder={"每行一个节点分享链接，例如：\nvmess://...\nss://..."}
+              placeholder={"每行一个节点分享链接，\nvmess://...\nss://..."}
             />
           </EditorSection>
 
-          <EditorSection
-            eyebrow="Template"
-            title="模板与目标类型"
-            description="模板来源仅支持内置模板与后台自建模板。"
-          >
-            <div className="grid gap-4 md:grid-cols-2">
+          <EditorSection eyebrow="Template" title="模板与目标类型" description="模板来源仅支持内置模板与后台自建模板。">
+            <div className="grid gap-4 xl:grid-cols-3">
               <Select
                 label="目标"
                 value={config.target}
                 onChange={(value) => setConfig((current) => ({ ...current, target: value }))}
                 options={[
                   { value: "meta", label: "Clash.Meta" },
-                  { value: "clash", label: "Clash" }
+                  { value: "clash", label: "Clash" },
                 ]}
               />
               <Select
@@ -703,15 +721,31 @@ export default function DashboardPage({ templates }) {
                 onChange={updateTemplate}
                 options={templateOptions}
               />
+              <Select
+                label="国家组排序"
+                value={config.options.sort}
+                onChange={(value) =>
+                  setConfig((current) => ({
+                    ...current,
+                    options: { ...current.options, sort: value },
+                  }))
+                }
+                options={[
+                  { value: "nameasc", label: "名称升序" },
+                  { value: "namedesc", label: "名称降序" },
+                  { value: "sizeasc", label: "数量升序" },
+                  { value: "sizedesc", label: "数量降序" },
+                ]}
+              />
             </div>
-            <div className="mt-5 grid gap-3 md:grid-cols-2">
+            <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               <Toggle
                 label="强制刷新订阅缓存"
                 checked={Boolean(config.options.refresh)}
                 onChange={(value) =>
                   setConfig((current) => ({
                     ...current,
-                    options: { ...current.options, refresh: value }
+                    options: { ...current.options, refresh: value },
                   }))
                 }
               />
@@ -721,7 +755,7 @@ export default function DashboardPage({ templates }) {
                 onChange={(value) =>
                   setConfig((current) => ({
                     ...current,
-                    options: { ...current.options, autoTest: value }
+                    options: { ...current.options, autoTest: value },
                   }))
                 }
               />
@@ -731,7 +765,7 @@ export default function DashboardPage({ templates }) {
                 onChange={(value) =>
                   setConfig((current) => ({
                     ...current,
-                    options: { ...current.options, lazy: value }
+                    options: { ...current.options, lazy: value },
                   }))
                 }
               />
@@ -741,7 +775,7 @@ export default function DashboardPage({ templates }) {
                 onChange={(value) =>
                   setConfig((current) => ({
                     ...current,
-                    options: { ...current.options, nodeList: value }
+                    options: { ...current.options, nodeList: value },
                   }))
                 }
               />
@@ -751,7 +785,7 @@ export default function DashboardPage({ templates }) {
                 onChange={(value) =>
                   setConfig((current) => ({
                     ...current,
-                    options: { ...current.options, ignoreCountryGroup: value }
+                    options: { ...current.options, ignoreCountryGroup: value },
                   }))
                 }
               />
@@ -761,39 +795,22 @@ export default function DashboardPage({ templates }) {
                 onChange={(value) =>
                   setConfig((current) => ({
                     ...current,
-                    options: { ...current.options, useUDP: value }
+                    options: { ...current.options, useUDP: value },
                   }))
                 }
               />
             </div>
-            <div className="mt-5 grid gap-4 md:grid-cols-2">
-              <Select
-                label="国家组排序"
-                value={config.options.sort}
-                onChange={(value) =>
-                  setConfig((current) => ({
-                    ...current,
-                    options: { ...current.options, sort: value }
-                  }))
-                }
-                options={[
-                  { value: "nameasc", label: "名称升序" },
-                  { value: "namedesc", label: "名称降序" },
-                  { value: "sizeasc", label: "数量升序" },
-                  { value: "sizedesc", label: "数量降序" }
-                ]}
-              />
-              <Input
-                label="User-Agent"
-                value={config.options.userAgent}
-                onChange={(value) =>
-                  setConfig((current) => ({
-                    ...current,
-                    options: { ...current.options, userAgent: value }
-                  }))
-                }
-              />
-            </div>
+            <Input
+              className="mt-5"
+              label="User-Agent"
+              value={config.options.userAgent}
+              onChange={(value) =>
+                setConfig((current) => ({
+                  ...current,
+                  options: { ...current.options, userAgent: value },
+                }))
+              }
+            />
           </EditorSection>
 
           <EditorSection
@@ -802,9 +819,7 @@ export default function DashboardPage({ templates }) {
             description="在模板之外继续扩展规则和 Rule Provider，支持前置插入。"
           >
             <div>
-              <p className="mb-3 text-[0.72rem] uppercase tracking-[0.16em] text-[var(--stone)]">
-                Rule Provider
-              </p>
+              <p className="mb-3 text-[0.72rem] uppercase text-[var(--stone)]">Rule Provider</p>
               <RuleProviderEditor
                 providers={config.routing.ruleProviders}
                 onChange={(ruleProviders) =>
@@ -812,16 +827,14 @@ export default function DashboardPage({ templates }) {
                     ...current,
                     routing: {
                       ...current.routing,
-                      ruleProviders
-                    }
+                      ruleProviders,
+                    },
                   }))
                 }
               />
             </div>
             <div className="mt-6">
-              <p className="mb-3 text-[0.72rem] uppercase tracking-[0.16em] text-[var(--stone)]">
-                规则列表
-              </p>
+              <p className="mb-3 text-[0.72rem] uppercase text-[var(--stone)]">规则列表</p>
               <RulesEditor
                 rules={config.routing.rules}
                 onChange={(rules) =>
@@ -829,8 +842,8 @@ export default function DashboardPage({ templates }) {
                     ...current,
                     routing: {
                       ...current.routing,
-                      rules
-                    }
+                      rules,
+                    },
                   }))
                 }
               />
@@ -843,20 +856,21 @@ export default function DashboardPage({ templates }) {
             description="`filterRegex` 会删除命中的节点；`replacements` 按顺序执行名称替换。"
           >
             <Input
-              label="过滤正则"
+              label="过滤"
               value={config.transforms.filterRegex}
               onChange={(value) =>
                 setConfig((current) => ({
                   ...current,
                   transforms: {
                     ...current.transforms,
-                    filterRegex: value
-                  }
+                    filterRegex: value,
+                  },
                 }))
               }
-              placeholder="例如：(过期|测试)"
+              placeholder="(过期|测试)"
             />
             <div className="mt-6">
+              <p className="mb-3 text-[0.72rem] uppercase text-[var(--stone)]">替换</p>
               <ReplacementEditor
                 replacements={config.transforms.replacements}
                 onChange={(replacements) =>
@@ -864,8 +878,8 @@ export default function DashboardPage({ templates }) {
                     ...current,
                     transforms: {
                       ...current.transforms,
-                      replacements
-                    }
+                      replacements,
+                    },
                   }))
                 }
               />
@@ -874,73 +888,53 @@ export default function DashboardPage({ templates }) {
 
           <EditorSection
             eyebrow="Share"
-            title="长链接与短链接"
+            title="订阅连接"
             description="长链接会直接携带整个配置；超过软限制时，建议改用短链接。"
           >
-            <Textarea
-              label="长链接"
-              value={longLink}
-              onChange={null}
-              rows={5}
-            />
-            <div className="mt-3 flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                className={primaryButtonClass}
-                onClick={copyLongLink}
-                disabled={!canCopyLongLink}
-              >
-                复制长链接
-              </button>
-              {!canCopyLongLink ? (
-                <p className="text-sm text-[var(--error)]">
-                  长链接接近 Workers URL 限制，建议生成短链接。
-                </p>
-              ) : null}
-            </div>
-
-            <div className="mt-6 grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto]">
+            <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end">
               <Input
-                label="自定义短链 ID"
-                value={customShortId}
-                onChange={setCustomShortId}
-                placeholder="可选，留空则随机生成"
+                className="min-w-0"
+                label="长链接"
+                value={longLink}
+                onChange={null}
+                readOnly
+                spellCheck={false}
+                inputClassName="font-mono text-[0.84rem]"
               />
-              <button
-                type="button"
-                onClick={createShortLink}
-                className={`${secondaryButtonClass} self-end`}
-              >
-                生成短链接
-              </button>
+              <div className="flex flex-wrap items-center gap-3 xl:self-end">
+                <Button variant="primary" className="whitespace-nowrap" onClick={createShortLink}>
+                  <LinkIcon />
+                  <span>生成短链接</span>
+                </Button>
+                <Button variant="secondary" className="whitespace-nowrap" onClick={renderCurrentConfig}>
+                  <EyeIcon />
+                  <span>预览 YAML</span>
+                </Button>
+              </div>
             </div>
+            {!canCopyLongLink ? (
+              <p className="mt-3 text-sm text-[var(--error)]">长链接接近 Workers URL 限制，建议生成短链接。</p>
+            ) : null}
 
             {shortLinkId ? (
               <div className="mt-5 border-t border-[var(--border)] pt-5">
-                <label className="field">
-                  <span className="field-label">当前短链</span>
-                  <input
-                    type="text"
-                    readOnly
+                <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end">
+                  <Input
+                    label="当前短链"
                     value={`${window.location.origin}/s/${shortLinkId}`}
-                    className="field-input"
+                    onChange={null}
+                    readOnly
                   />
-                </label>
-                <div className="mt-4 flex flex-wrap gap-3">
-                  <button
-                    type="button"
-                    onClick={updateShortLink}
-                    className={secondaryButtonClass}
-                  >
-                    用当前配置更新
-                  </button>
-                  <button
-                    type="button"
-                    onClick={removeShortLink}
-                    className={dangerButtonClass}
-                  >
-                    删除短链
-                  </button>
+                  <div className="flex flex-wrap items-center justify-center gap-3">
+                    <Button variant="primary" onClick={updateShortLink}>
+                      <RefreshIcon />
+                      <span>更新短链</span>
+                    </Button>
+                    <Button variant="danger" onClick={removeShortLink}>
+                      <TrashIcon />
+                      <span>删除短链</span>
+                    </Button>
+                  </div>
                 </div>
               </div>
             ) : null}
@@ -948,13 +942,16 @@ export default function DashboardPage({ templates }) {
         </div>
       </div>
 
-      <PreviewPanel
+      <PreviewDialog
+        open={previewOpen}
+        loading={previewLoading}
         preview={preview}
         stats={stats}
         warnings={warnings}
-        renderError={renderError}
+        previewError={previewError}
         subscriptionInfo={subscriptionInfo}
+        onClose={() => setPreviewOpen(false)}
       />
-    </div>
+    </>
   );
 }

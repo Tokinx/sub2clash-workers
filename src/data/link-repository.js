@@ -8,8 +8,8 @@ function validateId(id) {
   }
 }
 
-export async function createLink(env, config, customId) {
-  const id = customId ? customId.trim() : randomId(20);
+export async function createLink(env, config) {
+  const id = randomId(20);
   validateId(id);
   const key = buildLinkKey(id);
   const exists = await env.CACHE.get(key);

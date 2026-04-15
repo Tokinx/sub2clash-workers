@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 
+import { Button } from "../components/Button.jsx";
 import SectionCard from "../components/SectionCard.jsx";
 import { Input, Select, Textarea } from "../components/Fields.jsx";
 import { apiFetch } from "../lib/api.js";
@@ -9,7 +10,7 @@ function createEmptyTemplate() {
     id: "",
     name: "",
     target: "meta",
-    content: "mixed-port: 7890\nallow-lan: true\nmode: Rule\nproxies: []\nproxy-groups: []\nrules: []\n"
+    content: "mixed-port: 7890\nallow-lan: true\nmode: Rule\nproxies: []\nproxy-groups: []\nrules: []\n",
   };
 }
 
@@ -18,10 +19,7 @@ export default function TemplatesPage({ templates, refreshTemplates }) {
   const [message, setMessage] = useState("");
   const [preview, setPreview] = useState("");
 
-  const allTemplates = useMemo(
-    () => [...templates.builtin, ...templates.custom],
-    [templates]
-  );
+  const allTemplates = useMemo(() => [...templates.builtin, ...templates.custom], [templates]);
 
   function loadTemplate(template) {
     if (template.builtin) {
@@ -29,7 +27,7 @@ export default function TemplatesPage({ templates, refreshTemplates }) {
         id: template.id,
         name: template.name,
         target: template.target,
-        content: "内置模板内容由静态资源提供，不能直接编辑。"
+        content: "内置模板内容由静态资源提供，不能直接编辑。",
       });
       setPreview("");
       return;
@@ -46,8 +44,8 @@ export default function TemplatesPage({ templates, refreshTemplates }) {
           body: JSON.stringify({
             name: draft.name,
             target: draft.target,
-            content: draft.content
-          })
+            content: draft.content,
+          }),
         });
         setMessage("模板已更新");
       } else {
@@ -56,8 +54,8 @@ export default function TemplatesPage({ templates, refreshTemplates }) {
           body: JSON.stringify({
             name: draft.name,
             target: draft.target,
-            content: draft.content
-          })
+            content: draft.content,
+          }),
         });
         setDraft(created);
         setMessage("模板已创建");
@@ -71,7 +69,7 @@ export default function TemplatesPage({ templates, refreshTemplates }) {
   async function deleteTemplate(id) {
     await apiFetch(`/api/templates/${id}`, {
       method: "DELETE",
-      body: JSON.stringify({})
+      body: JSON.stringify({}),
     });
     setDraft(createEmptyTemplate());
     setMessage("模板已删除");
@@ -83,8 +81,8 @@ export default function TemplatesPage({ templates, refreshTemplates }) {
       method: "POST",
       body: JSON.stringify({
         action: "duplicate",
-        id
-      })
+        id,
+      }),
     });
     setMessage("模板已复制");
     await refreshTemplates();
@@ -92,22 +90,14 @@ export default function TemplatesPage({ templates, refreshTemplates }) {
 
   return (
     <div className="grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
-      <SectionCard
-        kicker="Library"
-        title="模板目录"
-        description="内置模板只读，自建模板可以编辑、复制和删除。"
-      >
+      <SectionCard kicker="Library" title="模板目录" description="内置模板只读，自建模板可以编辑、复制和删除。">
         <div className="space-y-3">
           {allTemplates.map((template) => (
             <article
               key={template.id}
               className="rounded-[1.25rem] border border-[var(--border)] bg-[var(--ivory)] p-4"
             >
-              <button
-                type="button"
-                className="w-full text-left"
-                onClick={() => loadTemplate(template)}
-              >
+              <button type="button" className="w-full text-left" onClick={() => loadTemplate(template)}>
                 <p className="text-xs uppercase tracking-[0.16em] text-[var(--stone)]">
                   {template.builtin ? "Builtin" : "Custom"}
                 </p>
@@ -116,20 +106,20 @@ export default function TemplatesPage({ templates, refreshTemplates }) {
               </button>
               {!template.builtin ? (
                 <div className="mt-4 flex gap-3">
-                  <button
-                    type="button"
+                  <Button
+                    variant="secondary"
                     onClick={() => duplicateTemplate(template.id)}
-                    className="rounded-full border border-[var(--border)] px-4 py-2 text-sm"
+                    className="rounded-full px-4 text-sm"
                   >
                     复制
-                  </button>
-                  <button
-                    type="button"
+                  </Button>
+                  <Button
+                    variant="danger"
                     onClick={() => deleteTemplate(template.id)}
-                    className="rounded-full border border-[var(--border)] px-4 py-2 text-sm text-[var(--error)]"
+                    className="rounded-full px-4 text-sm"
                   >
                     删除
-                  </button>
+                  </Button>
                 </div>
               ) : null}
             </article>
@@ -155,7 +145,7 @@ export default function TemplatesPage({ templates, refreshTemplates }) {
             onChange={(value) => setDraft((current) => ({ ...current, target: value }))}
             options={[
               { value: "meta", label: "Clash.Meta" },
-              { value: "clash", label: "Clash" }
+              { value: "clash", label: "Clash" },
             ]}
           />
         </div>
@@ -171,20 +161,16 @@ export default function TemplatesPage({ templates, refreshTemplates }) {
         />
         {message ? <p className="mt-4 text-sm text-[var(--muted)]">{message}</p> : null}
         <div className="mt-4 flex flex-wrap gap-3">
-          <button
-            type="button"
+          <Button
+            variant="secondary"
             onClick={() => setDraft(createEmptyTemplate())}
-            className="rounded-full border border-[var(--border)] px-4 py-2 text-sm"
+            className="rounded-full px-4 text-sm"
           >
             新建空模板
-          </button>
-          <button
-            type="button"
-            onClick={saveTemplate}
-            className="rounded-full bg-[var(--brand)] px-4 py-2 text-sm text-[var(--ivory)]"
-          >
+          </Button>
+          <Button variant="primary" onClick={saveTemplate} className="rounded-full px-4 text-sm">
             保存模板
-          </button>
+          </Button>
         </div>
         <div className="mt-6 rounded-[1.25rem] border border-[var(--border)] bg-[var(--ivory)] p-4">
           <p className="text-xs uppercase tracking-[0.16em] text-[var(--stone)]">实时预览</p>

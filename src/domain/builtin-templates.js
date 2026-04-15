@@ -6,14 +6,115 @@ export const BUILTIN_TEMPLATES = [
     name: "Clash 默认模板",
     target: "clash",
     builtin: true,
-    assetPath: "/templates/clash-default.yaml"
+    content: `mixed-port: 7890
+allow-lan: true
+mode: Rule
+log-level: info
+proxies: []
+proxy-groups:
+  - name: 节点选择
+    type: select
+    proxies:
+      - <countries>
+      - 手动切换
+      - DIRECT
+  - name: 手动切换
+    type: select
+    proxies:
+      - <all>
+  - name: OpenAI
+    type: select
+    proxies:
+      - 节点选择
+      - <countries>
+      - 手动切换
+      - DIRECT
+  - name: 国外媒体
+    type: select
+    proxies:
+      - 节点选择
+      - <countries>
+      - 手动切换
+      - DIRECT
+  - name: Telegram
+    type: select
+    proxies:
+      - 节点选择
+      - <countries>
+      - 手动切换
+      - DIRECT
+  - name: 漏网之鱼
+    type: select
+    proxies:
+      - 节点选择
+      - <countries>
+      - 手动切换
+      - DIRECT
+rules:
+  - DOMAIN-SUFFIX,openai.com,OpenAI
+  - DOMAIN-SUFFIX,chatgpt.com,OpenAI
+  - DOMAIN-SUFFIX,telegram.org,Telegram
+  - GEOIP,LAN,DIRECT
+  - MATCH,漏网之鱼
+`
   },
   {
     id: "meta-default",
     name: "Clash.Meta 默认模板",
     target: "meta",
     builtin: true,
-    assetPath: "/templates/meta-default.yaml"
+    content: `mixed-port: 7890
+allow-lan: true
+mode: Rule
+log-level: info
+ipv6: true
+proxies: []
+proxy-groups:
+  - name: 节点选择
+    type: select
+    proxies:
+      - <countries>
+      - 手动切换
+      - DIRECT
+  - name: 手动切换
+    type: select
+    proxies:
+      - <all>
+  - name: OpenAI
+    type: select
+    proxies:
+      - 节点选择
+      - <countries>
+      - 手动切换
+      - DIRECT
+  - name: 国外媒体
+    type: select
+    proxies:
+      - 节点选择
+      - <countries>
+      - 手动切换
+      - DIRECT
+  - name: Telegram
+    type: select
+    proxies:
+      - 节点选择
+      - <countries>
+      - 手动切换
+      - DIRECT
+  - name: 漏网之鱼
+    type: select
+    proxies:
+      - 节点选择
+      - <countries>
+      - 手动切换
+      - DIRECT
+rules:
+  - GEOSITE,openai,OpenAI
+  - GEOSITE,telegram,Telegram
+  - GEOSITE,geolocation-!cn,国外媒体
+  - GEOIP,private,DIRECT
+  - MATCH,漏网之鱼
+`
   }
 ];
 
@@ -26,18 +127,10 @@ export function listBuiltinTemplates() {
   }));
 }
 
-export async function loadBuiltinTemplate(env, request, id) {
+export async function loadBuiltinTemplate(_env, _request, id) {
   const template = BUILTIN_TEMPLATES.find((item) => item.id === id);
   if (!template) {
     throw notFound("内置模板不存在");
   }
-
-  const response = await env.ASSETS.fetch(new Request(new URL(template.assetPath, request.url)));
-  if (!response.ok) {
-    throw notFound("内置模板资源不存在");
-  }
-  return {
-    ...template,
-    content: await response.text()
-  };
+  return template;
 }
