@@ -104,7 +104,7 @@ function AddRowButton({ ariaLabel, onClick }) {
       type="button"
       variant="secondary"
       aria-label={ariaLabel}
-      className="w-full h-8 flex bg-transparent text-amber-800/50 hover:bg-amber-800/5 active:bg-amber-800/10"
+      className="w-full h-8 flex bg-[rgba(255,255,255,0.34)] text-primary/80 hover:bg-muted/50 active:bg-muted"
       onClick={onClick}
     >
       <Plus className="h-4 w-4" />
