@@ -167,3 +167,27 @@
   - `styles.css` 已收缩为主题 token 与全局基底样式，不再承载按钮、表单、弹窗、表格等组件语义样式
   - 新增通用 `Button` 组件并接入 Dashboard、Templates、Shell、Login
   - `Fields.jsx` 改为组件内部自带 Tailwind 样式，页面层主要保留布局与业务状态
+
+## shadcn 迁移回归 2026-04-15
+
+- 状态：已完成
+- 目标：将前端基础交互层切换为 `shadcn/ui`，并补齐前端测试基座
+- 变更：
+  - 新增 `frontend/components.json`、`frontend/jsconfig.json`、`frontend/src/components/ui/*`，前端基础组件统一改为 `shadcn/ui`
+  - 登录页、配置器、模板页、Shell、预览弹窗均已切到 `shadcn/ui` 组合实现，旧 `Fields.jsx` 已移除
+  - `frontend/src/styles.css` 已改为 `shadcn` CSS variables 主题层，并保留暖纸张、陶土色和编辑部式排版 token
+  - 新增前端 `vitest + jsdom + Testing Library` 测试基座，根测试脚本改为同时跑 Worker 与前端测试
+- 测试：
+  - `bun run build:frontend`
+  - `bun run test:frontend`
+  - `bun run test:worker`
+  - `bun run test`
+- 结果：
+  - 前端构建通过，继续输出到 `public/index.html` 与 `public/assets/*`
+  - Worker 侧 4 个测试文件、16 个测试用例通过
+  - 前端 4 个测试文件、7 个测试用例通过
+  - 根测试脚本已可串联 Worker 与前端回归
+- 现存风险：
+  - `DashboardPage` 虽已拆出编辑器组件，但仍有进一步下沉分享区与选项区的空间
+  - 前端测试以行为回归为主，尚未加入浏览器截图级视觉回归
+  - jsdom 环境在 Shell 登出路径上仍会打印一次 `navigation to another Document` 提示，但不影响浏览器中的真实行为

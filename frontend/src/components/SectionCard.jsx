@@ -1,28 +1,30 @@
-export default function SectionCard({ title, kicker, description, children, tone = "light" }) {
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
+
+export default function SectionCard({ title, kicker, description, children, tone = "light", className = "", contentClassName = "" }) {
+  const dark = tone === "dark";
+
   return (
-    <section
-      className={`rounded-[1.75rem] border p-5 shadow-[0_12px_40px_rgba(20,20,19,0.05)] md:p-7 ${
-        tone === "dark"
-          ? "border-[var(--dark-border)] bg-[var(--dark)] text-[var(--ivory)]"
-          : "border-[var(--border)] bg-[var(--card)]"
-      }`}
+    <Card
+      className={cn(
+        dark
+          ? "surface-dark border-[var(--dark-border)] bg-[var(--dark)] text-[var(--paper-soft)] shadow-[0_24px_60px_rgba(20,20,19,0.18)]"
+          : "border-border bg-card",
+        className
+      )}
     >
-      <div className="mb-5">
+      <CardHeader>
         {kicker ? (
-          <p className="mb-2 text-[0.7rem] uppercase tracking-[0.18em] text-[var(--stone)]">
+          <p className={cn("text-[0.72rem] uppercase tracking-[0.18em]", dark ? "text-[var(--silver)]" : "text-[var(--stone)]")}>
             {kicker}
           </p>
         ) : null}
-        <h2 className="font-display text-[1.75rem] leading-[1.1] md:text-[2.15rem]">
-          {title}
-        </h2>
+        <CardTitle>{title}</CardTitle>
         {description ? (
-          <p className={`mt-3 max-w-2xl text-sm leading-7 ${tone === "dark" ? "text-[var(--silver)]" : "text-[var(--muted)]"}`}>
-            {description}
-          </p>
+          <CardDescription className={dark ? "text-[var(--silver)]" : ""}>{description}</CardDescription>
         ) : null}
-      </div>
-      {children}
-    </section>
+      </CardHeader>
+      <CardContent className={contentClassName}>{children}</CardContent>
+    </Card>
   );
 }

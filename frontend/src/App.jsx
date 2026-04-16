@@ -29,7 +29,7 @@ export default function App() {
 
   if (session.loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[var(--paper)] text-[var(--muted)]">
+      <div className="flex min-h-screen items-center justify-center bg-[var(--paper)] text-muted-foreground">
         正在检查登录状态...
       </div>
     );

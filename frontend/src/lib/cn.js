@@ -1,3 +1,1 @@
-export function cn(...values) {
-  return values.filter(Boolean).join(" ");
-}
+export { cn } from "./utils.js";

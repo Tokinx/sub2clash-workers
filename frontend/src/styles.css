@@ -1,35 +1,84 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+
+@theme inline {
+  --font-sans: "IBM Plex Sans", "Avenir Next", "Segoe UI", sans-serif;
+  --font-serif: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", "Georgia", serif;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 0.2rem);
+  --radius-md: calc(var(--radius) - 0.08rem);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 0.32rem);
+  --radius-2xl: calc(var(--radius) + 0.9rem);
+}
 
 :root {
+  color-scheme: light;
+
+  --radius: 0.92rem;
+  --control-height: 2.875rem;
+
   --paper: #f5f4ed;
   --paper-soft: #faf9f5;
-  --card: #ffffff;
-  --ivory: #faf9f5;
+  --card-surface: #ffffff;
   --sand: #e8e6dc;
   --ink: #141413;
-  --dark: #1b1b19;
-  --dark-border: #30302e;
-  --muted: #5e5d59;
+  --ink-soft: #3d3d3a;
+  --muted-copy: #5e5d59;
   --stone: #87867f;
   --silver: #b0aea5;
   --brand: #c96442;
-  --border: #ece8dd;
-  --ring: rgba(94, 93, 89, 0.18);
-  --warm-gray: #c9c4b6;
+  --brand-soft: rgba(201, 100, 66, 0.12);
+  --border-warm: #ece8dd;
+  --border-strong: #ddd6c7;
   --error: #b53333;
-  --control-height: 2.875rem;
+  --dark: #1b1b19;
+  --dark-border: #30302e;
+  --dark-elevated: rgba(27, 27, 25, 0.94);
+
+  --background: var(--paper);
+  --foreground: var(--ink);
+  --card: var(--card-surface);
+  --card-foreground: var(--ink);
+  --popover: var(--paper-soft);
+  --popover-foreground: var(--ink);
+  --primary: var(--brand);
+  --primary-foreground: var(--paper-soft);
+  --secondary: var(--sand);
+  --secondary-foreground: var(--ink);
+  --muted: #efebe1;
+  --muted-foreground: var(--muted-copy);
+  --accent: #efe8de;
+  --accent-foreground: var(--ink);
+  --destructive: var(--error);
+  --destructive-foreground: var(--paper-soft);
+  --border: var(--border-warm);
+  --input: var(--border-strong);
+  --ring: rgba(201, 100, 66, 0.34);
 }
 
 html {
-  color: var(--ink);
   background: var(--paper);
-  font-family: "Source Serif 4", "Palatino Linotype", "Book Antiqua", serif;
-}
-
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
+  color: var(--ink);
+  font-family: var(--font-serif);
 }
 
 body {
@@ -39,7 +88,20 @@ body {
     radial-gradient(circle at top left, rgba(201, 100, 66, 0.08), transparent 28%),
     radial-gradient(circle at bottom right, rgba(20, 20, 19, 0.06), transparent 30%),
     var(--paper);
-  font-family: "IBM Plex Sans", "Avenir Next", "Segoe UI", sans-serif;
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-feature-settings: "liga" 1, "kern" 1;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+*,
+*::before,
+*::after {
+  border-color: var(--border);
+  outline-color: color-mix(in srgb, var(--ring) 50%, transparent);
 }
 
 #root {
@@ -47,5 +109,53 @@ body {
 }
 
 .font-display {
-  font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", "Georgia", serif;
+  font-family: var(--font-serif);
+}
+
+.editorial-grid {
+  position: relative;
+}
+
+.editorial-grid::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(to right, rgba(20, 20, 19, 0.025) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(20, 20, 19, 0.025) 1px, transparent 1px);
+  background-size: 24px 24px;
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.4), transparent 88%);
+}
+
+.surface-dark {
+  --card: var(--dark);
+  --card-foreground: var(--paper-soft);
+  --popover: var(--dark-elevated);
+  --popover-foreground: var(--paper-soft);
+  --secondary: rgba(250, 249, 245, 0.08);
+  --secondary-foreground: var(--paper-soft);
+  --muted: rgba(250, 249, 245, 0.06);
+  --muted-foreground: var(--silver);
+  --accent: rgba(250, 249, 245, 0.1);
+  --accent-foreground: var(--paper-soft);
+  --border: rgba(255, 255, 255, 0.12);
+  --input: rgba(255, 255, 255, 0.14);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+  }
 }

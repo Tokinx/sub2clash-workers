@@ -11,8 +11,12 @@
     "dev:frontend": "cd frontend && bun run dev",
     "build": "bun run build:frontend",
     "build:frontend": "cd frontend && bun run build",
-    "test": "vitest run",
-    "test:watch": "vitest",
+    "test": "bun run test:worker && bun run test:frontend",
+    "test:worker": "vitest run",
+    "test:worker:watch": "vitest",
+    "test:frontend": "cd frontend && bun run test",
+    "test:frontend:watch": "cd frontend && bun run test:watch",
+    "test:watch": "bun run test:worker:watch",
     "check": "bun run test"
   },
   "dependencies": {

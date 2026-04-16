@@ -1,8 +1,13 @@
+import { LockKeyhole, Sparkles } from "lucide-react";
 import { useState } from "react";
 
-import { Button } from "../components/Button.jsx";
-import { Input } from "../components/Fields.jsx";
-import { apiFetch } from "../lib/api.js";
+import Field from "@/components/Field";
+import SectionCard from "@/components/SectionCard.jsx";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { apiFetch } from "@/lib/api.js";
 
 export default function LoginPage({ onAuthenticated }) {
   const [password, setPassword] = useState("");
@@ -13,10 +18,11 @@ export default function LoginPage({ onAuthenticated }) {
     event.preventDefault();
     setError("");
     setLoading(true);
+
     try {
       await apiFetch("/api/auth/login", {
         method: "POST",
-        body: JSON.stringify({ password })
+        body: JSON.stringify({ password }),
       });
       onAuthenticated();
     } catch (submitError) {
@@ -27,63 +33,75 @@ export default function LoginPage({ onAuthenticated }) {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--paper)] px-5 py-8 text-[var(--ink)]  flex items-center">
-      <div className="mx-auto grid max-w-6xl gap-8 md:grid-cols-[1.1fr_0.9fr] md:items-center md:pb-[20%]">
-        <section className="">
-          <p className="mb-3 text-[0.72rem] uppercase tracking-[0.18em] text-[var(--stone)]">
-            Private Console
-          </p>
-          <h1 className="font-display text-[3rem] leading-[0.8] md:text-[4.7rem]">
+    <div className="min-h-screen flex">
+      <div className="flex-1 mx-auto gap-8 grid lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
+        <section className="h-full w-full flex flex-col pb-[40vh] lg:pb-0 overflow-auto lg:max-w-4xl max-h-200 mx-auto p-6 lg:px-6 gap-6">
+          <p className="mb-3 text-[0.72rem] uppercase tracking-[0.18em] text-[var(--stone)]">Private Console</p>
+          <h1 className="font-display text-[3rem] leading-[0.8] lg:text-[4.9rem]">
             Sub2Clash
             <br />
-            <span className="text-[2rem] md:text-[2.6rem]">on Cloudflare Workers</span>
+            <span className="text-[2rem] lg:text-[2.55rem]">on Cloudflare Workers</span>
           </h1>
-          <div className="mt-10 grid gap-4 grid-cols-3">
+          <p className="font-display mt-5 max-w-2xl text-base leading-8 text-muted-foreground">
+            这是一个订阅聚合控制器，
+            <br />
+            暖色纸张只是外表，
+            <br />
+            核心是受保护的规则引擎和模板系统。
+          </p>
+          <div className="lg:flex-1"></div>
+          <div className="lg:mt-10 grid lg:grid-cols-3 gap-4">
             {[
-              ["Aggregation", "Automatic aggregation of rules from multiple sources."],
-              ["Template", "Predefined templates for quick setup and configuration."],
-              ["Rules", "Flexible rule and tag system to meet personalized needs."]
+              ["Aggregation", "订阅与节点聚合，统一收口到一个可复用配置。"],
+              ["Template", "支持自定义模板，避免每次都从 YAML 白纸开始。"],
+              ["Routing", "Rules、Provider、替换与过滤可视化维护更轻松。"],
             ].map(([title, copy]) => (
-              <article
+              <div
                 key={title}
-                className="font-display rounded-[1.4rem] border border-[var(--border)] bg-[var(--card)] p-4"
+                className="border-t-2 border-primary/5 px-4 py-4 hover:border-primary/80! hover:bg-amber-800/5 transition space-y-2"
               >
-                <h2 className="text-xl">{title}</h2>
-                <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{copy}</p>
-              </article>
+                {/* <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[rgba(201,100,66,0.12)] text-[var(--brand)]">
+                    <Sparkles className="h-4 w-4" />
+                  </div> */}
+                <h2 className="font-display text-[1.35rem] leading-[1.08]">{title}</h2>
+                <p className="font-display text-sm leading-7 text-muted-foreground">{copy}</p>
+              </div>
             ))}
           </div>
         </section>
 
-        <section className="rounded-[2rem] border border-[var(--dark-border)] bg-[var(--dark)] p-8 text-[var(--ivory)] shadow-[0_24px_70px_rgba(20,20,19,0.18)] md:p-10">
-          <p className="mb-2 text-[0.72rem] uppercase tracking-[0.18em] text-[var(--silver)]">
-            Access
-          </p>
-          <h2 className="font-display text-[2.2rem]">Enter Password</h2>
-          <form
-            onSubmit={handleSubmit}
-            className="mt-8 space-y-4"
+        <div className="flex bg-white/80 absolute bottom-0 w-full h-[40%] rounded-t-xl backdrop-blur-sm lg:rounded-none lg:backdrop-[unset] lg:relative lg:h-full lg:w-[unset]! lg:justify-center lg:items-center ">
+          <SectionCard
+            kicker="Access"
+            title="Enter Password"
+            description="请输入访问密码以进入控制台。"
+            className="w-full max-w-lg mx-auto lg:mx-0 shadow-none lg:pb-[10%] lg:mb-0 bg-transparent"
           >
-            <Input
-              label="Password"
-              labelClassName="text-[var(--silver)]"
-              type="password"
-              value={password}
-              onChange={setPassword}
-              inputClassName="border-[var(--dark-border)] bg-[rgba(255,255,255,0.04)] text-[var(--ivory)]"
-              placeholder="Enter password"
-            />
-            {error ? <p className="text-sm text-[#ffb7a2]">{error}</p> : null}
-            <Button
-              type="submit"
-              variant="primary"
-              disabled={loading}
-              className="w-full rounded-[0.9rem] font-medium"
-            >
-              {loading ? "Verifying..." : "Enter Dashboard"}
-            </Button>
-          </form>
-        </section>
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <Field label="Password">
+                <Input
+                  type="password"
+                  value={password}
+                  placeholder="Enter password"
+                  className="shadow-none border border-primary/20! focus-visible:border-primary!  focus-visible:ring-0 focus-visible:ring-primary/50 focus-visible:ring-offset-0"
+                  onChange={(event) => setPassword(event.target.value)}
+                />
+              </Field>
+
+              {error ? (
+                <Alert variant="destructive" className="text-amber-600 [&>svg]:text-amber-600">
+                  <LockKeyhole className="h-4 w-4" />
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              ) : null}
+
+              <Button type="submit" disabled={loading} className="w-full justify-center">
+                <LockKeyhole className="h-4 w-4" />
+                <span>{loading ? "Verifying..." : "Enter Dashboard"}</span>
+              </Button>
+            </form>
+          </SectionCard>
+        </div>
       </div>
     </div>
   );
