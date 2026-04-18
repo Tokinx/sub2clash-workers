@@ -244,45 +244,7 @@ $patches:
               notIncludes: "| 落地"
 ```
 
-### 3. 对应你那段 JavaScript 的 YAML 版本
-
-```yaml
-+rules:
-  - DOMAIN-SUFFIX,30420400.xyz,DIRECT
-  - DOMAIN-SUFFIX,buf1.osid.cn,编程开发
-  - DOMAIN-SUFFIX,qmye.com,编程开发
-
-$patches:
-  - target: proxy-groups
-    op: upsert
-    position: start
-    match:
-      name: 前置节点
-    value:
-      name: 前置节点
-      icon: https://raw.githubusercontent.com/fmz200/wool_scripts/main/icons/apps/Gcp.png
-      type: select
-      proxies:
-        $select:
-          from: proxies
-          field: name
-          where:
-            name:
-              notIn:
-                - DIRECT
-                - REJECT
-              notIncludes: "| 落地"
-
-  - target: proxies
-    op: merge
-    match:
-      name:
-        includes: "| 落地"
-    value:
-      dialer-proxy: 前置节点
-```
-
-### 4. override 新增的 group 也支持 `<all>`
+### 3. override 新增的 group 也支持 `<all>`
 
 ```yaml
 $patches:

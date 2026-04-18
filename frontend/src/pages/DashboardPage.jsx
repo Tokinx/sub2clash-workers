@@ -662,7 +662,7 @@ export default function DashboardPage({ templates }) {
                 <code className="bg-primary/10 px-1.5 py-0.5">$select</code>{" "}
                 <a
                   className="ml-1 text-primary inline-flex items-center hover:underline"
-                  href="https://tokinx.github.io/sub2clash-workers/.docs/override.md"
+                  href="https://tokinx.github.io/sub2clash-workers/docs/override.md"
                   target="_blank"
                 >
                   查看文档

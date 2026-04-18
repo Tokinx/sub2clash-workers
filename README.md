@@ -113,10 +113,10 @@ bun run dev
 ## 相关文档
 
 - [DESIGN.md](./DESIGN.md)
-- [.docs/architecture.md](./.docs/architecture.md)
-- [.docs/api.md](./.docs/api.md)
-- [.docs/override.md](./.docs/override.md)
-- [.docs/regression.md](./.docs/regression.md)
+- [docs/architecture.md](./docs/architecture.md)
+- [docs/api.md](./docs/api.md)
+- [docs/override.md](./docs/override.md)
+- [docs/regression.md](./docs/regression.md)
 - [.tasks/roadmap.md](./.tasks/roadmap.md)
 
 ## 鸣谢
