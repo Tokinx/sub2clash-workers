@@ -23,6 +23,7 @@
 
 - 把多个订阅、零散节点和自定义规则收口到一个统一入口
 - 需要一个工具维护模板、规则和短链接，而不是手写 YAML
+- 扩展了 $patches、$select，服务端配置覆写规则更轻松
 - 无需服务器，部署简单无需维护
 
 ## 协议支持
@@ -114,6 +115,7 @@ bun run dev
 - [DESIGN.md](/root/Workspace/sub2clash-workers/DESIGN.md)
 - [.docs/architecture.md](/root/Workspace/sub2clash-workers/.docs/architecture.md)
 - [.docs/api.md](/root/Workspace/sub2clash-workers/.docs/api.md)
+- [.docs/override.md](/root/Workspace/sub2clash-workers/.docs/override.md)
 - [.docs/regression.md](/root/Workspace/sub2clash-workers/.docs/regression.md)
 - [.tasks/roadmap.md](/root/Workspace/sub2clash-workers/.tasks/roadmap.md)
 

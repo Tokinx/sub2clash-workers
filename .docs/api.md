@@ -23,6 +23,7 @@
 
 - `override.type`：当前仅支持 `yaml`
 - `override.content`：YAML 覆写文本，随 `/api/render`、短链配置和长链接 payload 一起传递
+- `override.content` 同时支持基础 merge 语法和项目自定义的 `$patches` / `$select` 扩展
 - 当 `options.nodeList = true` 且 `override.content` 非空时，接口仍正常返回 YAML，但 `warnings` 会包含“仅输出节点列表时已忽略覆写”
 
 ## 短链

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import YAML from "yaml";
 
 import { createLink, updateLink } from "../../src/data/link-repository.js";
 import { renderConfig, renderLink } from "../../src/domain/render.js";
@@ -236,6 +237,148 @@ describe("renderConfig", () => {
     expect(result.yaml).toContain("MATCH,DIRECT");
     expect(result.yaml).not.toContain("DOMAIN-SUFFIX,claude.ai,节点选择");
     expect(result.yaml).not.toContain("GEOSITE,openai,OpenAI");
+  });
+
+  it("扩展覆写语法可以表达前置节点和 dialer-proxy 场景", async () => {
+    const env = createEnv();
+
+    const result = await renderConfig(env, new Request("https://app.example.com/sub/demo"), {
+      target: "meta",
+      sources: {
+        subscriptions: [],
+        nodes: [
+          "ss://YWVzLTI1Ni1nY206cGFzc0BleGFtcGxlLmNvbTo4NDQz#香港A | 落地",
+          "trojan://secret@example.com:443#美国B"
+        ]
+      },
+      template: {
+        mode: "builtin",
+        value: "meta-default"
+      },
+      routing: {
+        ruleProviders: [],
+        rules: []
+      },
+      transforms: {
+        filterRegex: "",
+        replacements: []
+      },
+      override: {
+        type: "yaml",
+        content: `$patches:
+  - target: proxy-groups
+    op: upsert
+    position: start
+    match:
+      name: 前置节点
+    value:
+      name: 前置节点
+      type: select
+      proxies:
+        $select:
+          from: proxies
+          field: name
+          where:
+            name:
+              notIn:
+                - DIRECT
+                - REJECT
+              notIncludes: "| 落地"
+  - target: proxies
+    op: merge
+    match:
+      name:
+        includes: "| 落地"
+    value:
+      dialer-proxy: 前置节点
++rules:
+  - DOMAIN-SUFFIX,30420400.xyz,DIRECT
+`
+      },
+      options: {
+        sort: "nameasc",
+        autoTest: false,
+        lazy: false,
+        refresh: false,
+        nodeList: false,
+        ignoreCountryGroup: false,
+        userAgent: "tester",
+        useUDP: false
+      }
+    });
+
+    const parsed = YAML.parse(result.yaml);
+    const preGroup = parsed["proxy-groups"].find((group) => group.name === "前置节点");
+
+    expect(preGroup).toEqual({
+      name: "前置节点",
+      type: "select",
+      proxies: ["美国B"]
+    });
+    expect(result.yaml).toContain("dialer-proxy: 前置节点");
+    expect(result.yaml).toContain("DOMAIN-SUFFIX,30420400.xyz,DIRECT");
+  });
+
+  it("覆写新增的 proxy-group 也会展开 <all> 占位符", async () => {
+    const env = createEnv();
+
+    const result = await renderConfig(env, new Request("https://app.example.com/sub/demo"), {
+      target: "meta",
+      sources: {
+        subscriptions: [],
+        nodes: [
+          "ss://YWVzLTI1Ni1nY206cGFzc0BleGFtcGxlLmNvbTo4NDQz#节点甲",
+          "trojan://secret@example.com:443#节点乙"
+        ]
+      },
+      template: {
+        mode: "builtin",
+        value: "meta-default"
+      },
+      routing: {
+        ruleProviders: [],
+        rules: []
+      },
+      transforms: {
+        filterRegex: "",
+        replacements: []
+      },
+      override: {
+        type: "yaml",
+        content: `$patches:
+  - target: proxy-groups
+    op: upsert
+    position: end
+    match:
+      name: 全部节点
+    value:
+      name: 全部节点
+      type: select
+      proxies:
+        - <all>
+`
+      },
+      options: {
+        sort: "nameasc",
+        autoTest: false,
+        lazy: false,
+        refresh: false,
+        nodeList: false,
+        ignoreCountryGroup: false,
+        userAgent: "tester",
+        useUDP: false
+      }
+    });
+
+    const parsed = YAML.parse(result.yaml);
+    const allGroup = parsed["proxy-groups"].find((group) => group.name === "全部节点");
+
+    expect(allGroup).toEqual({
+      name: "全部节点",
+      type: "select",
+      proxies: ["节点甲", "节点乙"]
+    });
+    expect(result.yaml).not.toContain("- <all>");
   });
 
   it("nodeList 模式会忽略覆写并返回 warning", async () => {

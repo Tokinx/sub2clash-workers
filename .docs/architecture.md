@@ -25,6 +25,8 @@
 - `config.override` 作为单份配置的一部分参与长链接、短链接与实时预览，不新增独立 KV key
 - 当前仅支持 `type: yaml`，内容在模板合并、规则增强、国家组生成之后执行
 - YAML 覆写支持深度合并、`!` 整段替换、`+key` 前插数组、`key+` 后追加数组，以及 `<...>` 转义真实键名
+- 扩展语法新增顶层 `$patches` 和值级 `$select`，用于按条件更新对象数组、upsert 策略组，以及从已有 `proxies` / `proxy-groups` 动态提取字段
+- override 新增或修改过的 `proxy-groups` 会在最终输出前再次展开 `<all>` / `<countries>` / `<us>` 这类占位符
 - `nodeList` 模式不会执行覆写；若存在覆写内容，渲染接口会返回 warning，避免静默失效
 
 ## 短链目录

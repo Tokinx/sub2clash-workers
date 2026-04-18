@@ -440,6 +440,12 @@ export async function renderConfig(env, request, inputConfig, context) {
 
     let merged = mergeTemplate(template.content, proxies, countryGroups, config);
     merged = applyYamlOverride(merged, config.override.content);
+    if (Array.isArray(merged["proxy-groups"])) {
+      const proxyNames = proxies.map((proxy) => proxy.name);
+      merged["proxy-groups"] = merged["proxy-groups"].map((group) =>
+        expandGroupPlaceholders(group, proxyNames, countryGroups, config.options.ignoreCountryGroup)
+      );
+    }
     const yaml = YAML.stringify(deepClean(merged));
 
     return {

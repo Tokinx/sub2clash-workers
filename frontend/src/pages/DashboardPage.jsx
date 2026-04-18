@@ -1,4 +1,4 @@
-import { AlertCircle, Copy, Eye, Link2, RefreshCw, Search, Trash2, WrapText } from "lucide-react";
+import { AlertCircle, Copy, Eye, Link2, RefreshCw, Search, Trash2, ExternalLink } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import YAML from "yaml";
 
@@ -627,28 +627,14 @@ export default function DashboardPage({ templates }) {
           <EditorSection
             eyebrow="Override"
             title="配置覆写"
-            description="仅支持 YAML 覆写，在模板合并、规则增强和节点整理之后最终生效"
+            description="支持 Mihomo YAML 覆写语法，在模板合并、规则增强和节点整理之后最终生效"
           >
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <p className="text-[0.72rem] uppercase tracking-[0.16em] text-[var(--stone)]">覆写内容</p>
-              <Button
-                type="button"
-                variant="secondary"
-                className="px-4"
-                aria-label="格式化覆写 YAML"
-                onClick={formatOverrideYaml}
-              >
-                <WrapText className="h-4 w-4" />
-                <span>格式化 YAML</span>
-              </Button>
-            </div>
-
             <Textarea
               rows={11}
               aria-label="覆写内容"
               value={config.override.content}
               placeholder={
-                "mixed-port!: 7891\n+rules:\n  - DOMAIN-SUFFIX,example.com,DIRECT\nproxy-groups+:\n  - name: 自定义组\n    type: select\n    proxies:\n      - 节点选择"
+                '$patches:\n  - target: proxies\n    op: merge\n    match:\n      name:\n        includes: "| 落地"\n    value:\n      dialer-proxy: 前置节点'
               }
               onChange={(event) =>
                 setConfig((current) => ({
@@ -660,10 +646,30 @@ export default function DashboardPage({ templates }) {
                 }))
               }
             />
-            <p className="text-sm leading-6 text-muted-foreground">
-              支持深度合并，`foo!` 覆盖整个字段，`+rules` 前插数组，`rules+` 后追加数组，`&lt;...&gt;`
-              用于转义真实键名。
-            </p>
+
+            <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
+              <Button
+                type="button"
+                variant="secondary"
+                className="px-3 h-8 text-xs"
+                aria-label="格式化覆写 YAML"
+                onClick={formatOverrideYaml}
+              >
+                <span>格式化 YAML</span>
+              </Button>
+              <p className="text-sm leading-6 text-muted-foreground">
+                高级语法支持 <code className="bg-primary/10 px-1.5 py-0.5">$patches</code>{" "}
+                <code className="bg-primary/10 px-1.5 py-0.5">$select</code>{" "}
+                <a
+                  className="ml-1 text-primary inline-flex items-center hover:underline"
+                  href="https://tokinx.github.io/sub2clash-workers/.docs/override.md"
+                  target="_blank"
+                >
+                  查看文档
+                  <ExternalLink className="w-3 h-3 inline ml-1" />
+                </a>
+              </p>
+            </div>
           </EditorSection>
 
           <EditorSection

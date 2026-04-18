@@ -358,3 +358,26 @@
 - 现存风险：
   - 当前仅支持 YAML override，不支持 JavaScript override
   - Vite 生产构建仍提示主包体积超过 500 kB，本次未处理拆包
+
+## YAML 覆写语法扩展回归 2026-04-18 CST
+
+- 状态：已完成
+- 目标：让 YAML override 能覆盖对象数组条件修改、upsert 策略组和动态提取现有节点字段的场景，替代一部分原本必须依赖 JavaScript override 的需求
+- 变更：
+  - `src/domain/yaml-override.js` 新增顶层 `$patches` 和值级 `$select`
+  - `$patches` 支持 `merge / replace / remove / upsert`，并提供 `match` 条件匹配和 `position` 插入位置
+  - `match` 支持 `equals`、`in`、`notIn`、`includes`、`notIncludes`、`startsWith`、`endsWith`、`regex`、`exists`
+  - `src/domain/render.js` 在 override 之后新增一轮 `proxy-groups` 占位符展开，让 override 插入的 `<all>` 等占位符也能正常工作
+  - 新增 [.docs/override.md](/root/Workspace/sub2clash-workers/.docs/override.md)，汇总完整语法、执行顺序、限制和示例
+- 测试：
+  - `bun run test:worker -- tests/unit/yaml-override.test.js tests/unit/render.test.js`
+  - `bun run test`
+  - `bun run build:frontend`
+- 结果：
+  - Worker 侧 6 个测试文件、39 个测试用例通过
+  - 前端 5 个测试文件、8 个测试用例通过
+  - YAML override 现已能表达“按节点名命中后写入 `dialer-proxy`”“不存在则 upsert 前置节点组”“从 `proxies` 动态提取名字列表”等场景
+  - override 新增的策略组中使用 `<all>` 不会再原样泄漏到最终 YAML
+- 现存风险：
+  - `$patches` 当前要求 `target` 指向已存在的数组字段，不会自动创建缺失路径
+  - `$select` 当前只支持返回数组，不支持聚合、去重和排序等更复杂表达式
