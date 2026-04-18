@@ -29,6 +29,11 @@ function createConfig(overrides = {}) {
       replacements: [],
       ...(overrides.transforms || {})
     },
+    override: {
+      type: "yaml",
+      content: "",
+      ...(overrides.override || {})
+    },
     options: {
       sort: "nameasc",
       autoTest: false,
@@ -189,6 +194,90 @@ describe("renderConfig", () => {
     expect(result.yaml).toContain("BuiltinSafe");
     expect(result.yaml).toContain("proxy-groups:");
     expect(result.yaml).not.toContain("<!doctype html>");
+  });
+
+  it("覆写会在模板合并之后最终生效", async () => {
+    const env = createEnv();
+
+    const result = await renderConfig(env, new Request("https://app.example.com/sub/demo"), {
+      target: "meta",
+      sources: {
+        subscriptions: [],
+        nodes: ["ss://YWVzLTI1Ni1nY206cGFzc0BleGFtcGxlLmNvbTo4NDQz#OverrideNode"]
+      },
+      template: {
+        mode: "builtin",
+        value: "meta-default"
+      },
+      routing: {
+        ruleProviders: [],
+        rules: [{ value: "DOMAIN-SUFFIX,claude.ai,节点选择", prepend: true }]
+      },
+      transforms: {
+        filterRegex: "",
+        replacements: []
+      },
+      override: {
+        type: "yaml",
+        content: "rules!:\n  - MATCH,DIRECT\n"
+      },
+      options: {
+        sort: "nameasc",
+        autoTest: false,
+        lazy: false,
+        refresh: false,
+        nodeList: false,
+        ignoreCountryGroup: false,
+        userAgent: "tester",
+        useUDP: false
+      }
+    });
+
+    expect(result.yaml).toContain("MATCH,DIRECT");
+    expect(result.yaml).not.toContain("DOMAIN-SUFFIX,claude.ai,节点选择");
+    expect(result.yaml).not.toContain("GEOSITE,openai,OpenAI");
+  });
+
+  it("nodeList 模式会忽略覆写并返回 warning", async () => {
+    const env = createEnv();
+
+    const result = await renderConfig(env, new Request("https://app.example.com/sub/demo"), {
+      target: "meta",
+      sources: {
+        subscriptions: [],
+        nodes: ["ss://YWVzLTI1Ni1nY206cGFzc0BleGFtcGxlLmNvbTo4NDQz#NodeOnly"]
+      },
+      template: {
+        mode: "builtin",
+        value: "meta-default"
+      },
+      routing: {
+        ruleProviders: [],
+        rules: []
+      },
+      transforms: {
+        filterRegex: "",
+        replacements: []
+      },
+      override: {
+        type: "yaml",
+        content: "proxies!:\n  - name: 覆写节点\n"
+      },
+      options: {
+        sort: "nameasc",
+        autoTest: false,
+        lazy: false,
+        refresh: false,
+        nodeList: true,
+        ignoreCountryGroup: false,
+        userAgent: "tester",
+        useUDP: false
+      }
+    });
+
+    expect(result.warnings).toEqual(["仅输出节点列表时已忽略覆写"]);
+    expect(result.yaml).toContain("NodeOnly");
+    expect(result.yaml).not.toContain("覆写节点");
   });
 
   it("同域短链订阅会在 Worker 内部解析而不是再次远程抓取", async () => {

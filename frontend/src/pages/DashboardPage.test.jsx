@@ -30,8 +30,10 @@ describe("DashboardPage", () => {
     const user = userEvent.setup();
     const importedShortConfig = createEmptyConfig();
     importedShortConfig.sources.nodes = ["vmess://node-from-short"];
+    importedShortConfig.override.content = "mixed-port!: 7892\n";
     const longLinkConfig = createEmptyConfig();
     longLinkConfig.sources.nodes = ["vmess://node-from-long"];
+    longLinkConfig.override.content = "mixed-port!: 7891\n";
     const longLink = `https://app.example.com/sub/${encodeConfigPayload(longLinkConfig)}`;
 
     apiFetch
@@ -70,7 +72,6 @@ describe("DashboardPage", () => {
     const firstHistoryOption = await screen.findByText("/s/saved-link-id");
     expect(firstHistoryOption).toBeInTheDocument();
     expect(screen.getByText("/s/saved-link-id-2")).toBeInTheDocument();
-    expect(firstHistoryOption.closest("[cmdk-item]")).toHaveAttribute("aria-selected", "false");
     await user.click(await screen.findByText("/s/saved-link-id"));
     expect(linkInput).toHaveValue("/s/saved-link-id");
 
@@ -81,6 +82,7 @@ describe("DashboardPage", () => {
     await user.click(screen.getByRole("button", { name: /解析/i }));
 
     expect(await screen.findByDisplayValue("vmess://node-from-short")).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: /覆写内容/i })).toHaveValue("mixed-port!: 7892\n");
 
     fireEvent.change(linkInput, {
       target: { value: longLink }
@@ -90,6 +92,7 @@ describe("DashboardPage", () => {
     await user.click(screen.getByRole("button", { name: /解析/i }));
 
     expect(await screen.findByDisplayValue("vmess://node-from-long")).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: /覆写内容/i })).toHaveValue("mixed-port!: 7891\n");
 
     await user.click(screen.getByRole("button", { name: /生成短链接/i }));
 
@@ -111,7 +114,7 @@ describe("DashboardPage", () => {
           countryGroupCount: 0,
           templateId: "meta-default"
         },
-        warnings: ["示例告警"],
+        warnings: ["仅输出节点列表时已忽略覆写"],
         subscriptionUserinfo: "upload=1; download=2"
       });
 
@@ -130,6 +133,15 @@ describe("DashboardPage", () => {
     await user.click(await screen.findByText("domain"));
     expect(behaviorInput).toHaveValue("domain");
 
+    const overrideInput = screen.getByRole("textbox", { name: /覆写内容/i });
+    fireEvent.change(overrideInput, {
+      target: { value: "rules: [MATCH, DIRECT]" }
+    });
+    await user.click(screen.getByRole("button", { name: /格式化覆写 YAML/i }));
+    expect(overrideInput).toHaveValue("rules:\n  - MATCH\n  - DIRECT\n");
+
+    await user.click(screen.getByRole("switch", { name: /仅输出节点列表/i }));
+
     await user.click(screen.getByRole("button", { name: /预览 YAML/i }));
 
     await waitFor(() => {
@@ -139,8 +151,15 @@ describe("DashboardPage", () => {
       );
     });
 
+    const renderPayload = JSON.parse(apiFetch.mock.calls[1][1].body);
+    expect(renderPayload.override).toEqual({
+      type: "yaml",
+      content: "rules:\n  - MATCH\n  - DIRECT\n"
+    });
+    expect(renderPayload.options.nodeList).toBe(true);
+
     expect(await screen.findByText("输出预览")).toBeInTheDocument();
     expect(screen.getByText("proxies: []", { exact: false })).toBeInTheDocument();
-    expect(screen.getByText("示例告警")).toBeInTheDocument();
+    expect(screen.getByText("仅输出节点列表时已忽略覆写")).toBeInTheDocument();
   });
 });

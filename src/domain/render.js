@@ -11,6 +11,7 @@ import { loadBuiltinTemplate } from "./builtin-templates.js";
 import { validateAndNormalizeConfig } from "./config.js";
 import { detectCountryName, resolveCountryByCode } from "./country.js";
 import { filterSupportedProxies, parseProxyLink, parseSubscriptionBody } from "./parsers/index.js";
+import { applyYamlOverride } from "./yaml-override.js";
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -351,7 +352,7 @@ function mergeTemplate(templateContent, proxies, countryGroups, config) {
     );
   }
 
-  return deepClean(next);
+  return next;
 }
 
 async function collectRemoteProxies(env, request, config, context) {
@@ -413,8 +414,13 @@ export async function renderConfig(env, request, inputConfig, context) {
     proxies = applyFilterAndReplace(proxies, config);
 
     const countryGroups = buildCountryGroups(proxies, config.options);
+    const warnings = [];
 
     if (config.options.nodeList) {
+      if (config.override.content.trim()) {
+        warnings.push("仅输出节点列表时已忽略覆写");
+      }
+
       const yaml = YAML.stringify(
         deepClean({
           proxies
@@ -427,13 +433,14 @@ export async function renderConfig(env, request, inputConfig, context) {
           countryGroupCount: countryGroups.length,
           templateId: template.id
         },
-        warnings: [],
+        warnings,
         subscriptionUserinfo: remote.subscriptionUserinfo
       };
     }
 
-    const merged = mergeTemplate(template.content, proxies, countryGroups, config);
-    const yaml = YAML.stringify(merged);
+    let merged = mergeTemplate(template.content, proxies, countryGroups, config);
+    merged = applyYamlOverride(merged, config.override.content);
+    const yaml = YAML.stringify(deepClean(merged));
 
     return {
       yaml,
@@ -442,7 +449,7 @@ export async function renderConfig(env, request, inputConfig, context) {
         countryGroupCount: countryGroups.length,
         templateId: template.id
       },
-      warnings: [],
+      warnings,
       subscriptionUserinfo: remote.subscriptionUserinfo
     };
   });

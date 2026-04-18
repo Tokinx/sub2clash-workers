@@ -29,7 +29,7 @@ export function encodeConfigPayload(config) {
 }
 
 export function decodeConfigPayload(payload) {
-  return JSON.parse(decoder.decode(base64ToBytes(payload)));
+  return normalizeConfig(JSON.parse(decoder.decode(base64ToBytes(payload))));
 }
 
 export function createEmptyConfig() {
@@ -51,6 +51,10 @@ export function createEmptyConfig() {
       filterRegex: "",
       replacements: []
     },
+    override: {
+      type: "yaml",
+      content: ""
+    },
     options: {
       refresh: false,
       autoTest: false,
@@ -60,6 +64,50 @@ export function createEmptyConfig() {
       ignoreCountryGroup: false,
       userAgent: "",
       useUDP: false
+    }
+  };
+}
+
+export function normalizeConfig(config = {}) {
+  const fallback = createEmptyConfig();
+
+  return {
+    ...fallback,
+    ...config,
+    sources: {
+      ...fallback.sources,
+      ...(config.sources || {}),
+      subscriptions: Array.isArray(config.sources?.subscriptions)
+        ? config.sources.subscriptions
+        : fallback.sources.subscriptions,
+      nodes: Array.isArray(config.sources?.nodes) ? config.sources.nodes : fallback.sources.nodes
+    },
+    template: {
+      ...fallback.template,
+      ...(config.template || {})
+    },
+    routing: {
+      ...fallback.routing,
+      ...(config.routing || {}),
+      ruleProviders: Array.isArray(config.routing?.ruleProviders)
+        ? config.routing.ruleProviders
+        : fallback.routing.ruleProviders,
+      rules: Array.isArray(config.routing?.rules) ? config.routing.rules : fallback.routing.rules
+    },
+    transforms: {
+      ...fallback.transforms,
+      ...(config.transforms || {}),
+      replacements: Array.isArray(config.transforms?.replacements)
+        ? config.transforms.replacements
+        : fallback.transforms.replacements
+    },
+    override: {
+      ...fallback.override,
+      ...(config.override || {})
+    },
+    options: {
+      ...fallback.options,
+      ...(config.options || {})
     }
   };
 }

@@ -82,6 +82,10 @@ describe("worker api", () => {
               filterRegex: "",
               replacements: []
             },
+            override: {
+              type: "yaml",
+              content: "rules+:\n  - DOMAIN-SUFFIX,example.com,DIRECT\n"
+            },
             options: {
               sort: "nameasc",
               autoTest: false,
@@ -123,6 +127,56 @@ describe("worker api", () => {
     );
     expect(linksData.links[0]).not.toHaveProperty("config");
 
+    const renderApiResponse = await app.request(
+      "https://app.example.com/api/render",
+      {
+        method: "POST",
+        headers: {
+          cookie,
+          "content-type": "application/json"
+        },
+        body: JSON.stringify({
+          target: "meta",
+          sources: {
+            subscriptions: [],
+            nodes: [
+              "ss://YWVzLTI1Ni1nY206cGFzc0BleGFtcGxlLmNvbTo4NDQz#RenderNode"
+            ]
+          },
+          template: {
+            mode: "builtin",
+            value: "meta-default"
+          },
+          routing: {
+            ruleProviders: [],
+            rules: []
+          },
+          transforms: {
+            filterRegex: "",
+            replacements: []
+          },
+          override: {
+            type: "yaml",
+            content: "mixed-port!: 9091\n"
+          },
+          options: {
+            sort: "nameasc",
+            autoTest: false,
+            lazy: false,
+            refresh: false,
+            nodeList: false,
+            ignoreCountryGroup: false,
+            userAgent: "tester",
+            useUDP: false
+          }
+        })
+      },
+      env
+    );
+    expect(renderApiResponse.status).toBe(200);
+    const renderData = await renderApiResponse.json();
+    expect(renderData.yaml).toContain("mixed-port: 9091");
+
     const renderResponse = await app.request(
       "https://app.example.com/s/" + link.id,
       {},
@@ -132,6 +186,7 @@ describe("worker api", () => {
     const yaml = await renderResponse.text();
     expect(yaml).toContain("SS-Node");
     expect(yaml).toContain("节点选择");
+    expect(yaml).toContain("DOMAIN-SUFFIX,example.com,DIRECT");
 
     vi.unstubAllGlobals();
   });

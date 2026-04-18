@@ -105,6 +105,33 @@ export function validateAndNormalizeConfig(input) {
     ...(input.options || {})
   };
 
+  let override = {
+    type: "yaml",
+    content: ""
+  };
+
+  if (input.override !== undefined) {
+    if (!input.override || typeof input.override !== "object" || Array.isArray(input.override)) {
+      throw badRequest("override 配置无效");
+    }
+
+    if (input.override.type !== "yaml") {
+      throw badRequest("override.type 仅支持 yaml");
+    }
+
+    if (
+      input.override.content !== undefined &&
+      typeof input.override.content !== "string"
+    ) {
+      throw badRequest("override.content 必须是字符串");
+    }
+
+    override = {
+      type: "yaml",
+      content: String(input.override.content || "")
+    };
+  }
+
   if (!VALID_SORTS.has(options.sort)) {
     options.sort = DEFAULT_OPTIONS.sort;
   }
@@ -127,6 +154,7 @@ export function validateAndNormalizeConfig(input) {
       filterRegex: String(input.transforms?.filterRegex || ""),
       replacements
     },
+    override,
     options
   };
 }

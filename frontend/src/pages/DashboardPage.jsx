@@ -1,5 +1,6 @@
-import { AlertCircle, Copy, Eye, Link2, RefreshCw, Search, Trash2 } from "lucide-react";
+import { AlertCircle, Copy, Eye, Link2, RefreshCw, Search, Trash2, WrapText } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import YAML from "yaml";
 
 import Field from "@/components/Field";
 import LinkAutocomplete from "@/components/dashboard/LinkAutocomplete.jsx";
@@ -20,7 +21,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { apiFetch } from "@/lib/api.js";
-import { createEmptyConfig, decodeConfigPayload, encodeConfigPayload } from "@/lib/config.js";
+import { createEmptyConfig, decodeConfigPayload, encodeConfigPayload, normalizeConfig } from "@/lib/config.js";
 
 const LONG_LINK_SOFT_LIMIT = 15_500;
 
@@ -193,6 +194,27 @@ export default function DashboardPage({ templates }) {
     }));
   }
 
+  function formatOverrideYaml() {
+    if (!config.override.content.trim()) {
+      showError("覆写内容为空，无需格式化");
+      return;
+    }
+
+    try {
+      const formattedContent = YAML.stringify(YAML.parse(config.override.content));
+      setConfig((current) => ({
+        ...current,
+        override: {
+          ...current.override,
+          content: formattedContent,
+        },
+      }));
+      showSuccess("覆写 YAML 已格式化");
+    } catch (error) {
+      showError(error.message || "覆写 YAML 格式错误，无法格式化");
+    }
+  }
+
   async function renderCurrentConfig() {
     setPreviewLoading(true);
     setPreviewError("");
@@ -241,8 +263,9 @@ export default function DashboardPage({ templates }) {
       if (url.pathname.startsWith("/s/")) {
         const id = url.pathname.split("/").pop();
         const data = await apiFetch(`/api/links/${id}`);
-        setConfig(data.config);
-        setNodesText((data.config.sources?.nodes || []).join("\n"));
+        const nextConfig = normalizeConfig(data.config);
+        setConfig(nextConfig);
+        setNodesText((nextConfig.sources?.nodes || []).join("\n"));
         setShortLinkId(data.id);
         showSuccess("已导入短链接配置");
         return;
@@ -599,6 +622,48 @@ export default function DashboardPage({ templates }) {
                 }
               />
             </div>
+          </EditorSection>
+
+          <EditorSection
+            eyebrow="Override"
+            title="配置覆写"
+            description="仅支持 YAML 覆写，在模板合并、规则增强和节点整理之后最终生效"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-[0.72rem] uppercase tracking-[0.16em] text-[var(--stone)]">覆写内容</p>
+              <Button
+                type="button"
+                variant="secondary"
+                className="px-4"
+                aria-label="格式化覆写 YAML"
+                onClick={formatOverrideYaml}
+              >
+                <WrapText className="h-4 w-4" />
+                <span>格式化 YAML</span>
+              </Button>
+            </div>
+
+            <Textarea
+              rows={11}
+              aria-label="覆写内容"
+              value={config.override.content}
+              placeholder={
+                "mixed-port!: 7891\n+rules:\n  - DOMAIN-SUFFIX,example.com,DIRECT\nproxy-groups+:\n  - name: 自定义组\n    type: select\n    proxies:\n      - 节点选择"
+              }
+              onChange={(event) =>
+                setConfig((current) => ({
+                  ...current,
+                  override: {
+                    ...current.override,
+                    content: event.target.value,
+                  },
+                }))
+              }
+            />
+            <p className="text-sm leading-6 text-muted-foreground">
+              支持深度合并，`foo!` 覆盖整个字段，`+rules` 前插数组，`rules+` 后追加数组，`&lt;...&gt;`
+              用于转义真实键名。
+            </p>
           </EditorSection>
 
           <EditorSection
