@@ -68,12 +68,12 @@ describe("renderConfig", () => {
     vi.restoreAllMocks();
   });
 
-  it("可以合并订阅、规则和国家分组", async () => {
+  it("可以合并订阅、规则和国家分组，备注不会参与节点命名", async () => {
     const env = createEnv();
     const result = await renderConfig(env, new Request("https://app.example.com/"), {
       target: "meta",
       sources: {
-        subscriptions: [{ url: "https://sub.example.com/alpha", prefix: "机场A" }],
+        subscriptions: [{ url: "https://sub.example.com/alpha", remark: "机场A" }],
         nodes: []
       },
       template: {
@@ -101,8 +101,9 @@ describe("renderConfig", () => {
     });
 
     expect(result.subscriptionUserinfo).toContain("upload=");
-    expect(result.yaml).toContain("机场A 香港专线");
-    expect(result.yaml).toContain("机场A 美国专线");
+    expect(result.yaml).toContain("香港专线");
+    expect(result.yaml).toContain("美国专线");
+    expect(result.yaml).not.toContain("机场A 香港专线");
     expect(result.yaml).toContain("DOMAIN-SUFFIX,claude.ai,节点选择");
     expect(result.stats.proxyCount).toBe(2);
   });
@@ -423,7 +424,7 @@ describe("renderConfig", () => {
     expect(result.yaml).not.toContain("覆写节点");
   });
 
-  it("同域短链订阅会在 Worker 内部解析而不是再次远程抓取", async () => {
+  it("同域短链订阅会在 Worker 内部解析，且备注或旧 prefix 都不会改写节点名", async () => {
     const env = createEnv();
     const first = await createLink(
       env,
@@ -450,7 +451,7 @@ describe("renderConfig", () => {
       createConfig({
         sources: {
           subscriptions: [
-            { url: `https://app.example.com/s/${first.id}`, prefix: "节点A" },
+            { url: `https://app.example.com/s/${first.id}`, remark: "节点A" },
             { url: `https://app.example.com/s/${second.id}`, prefix: "节点B" }
           ],
           nodes: []
@@ -458,8 +459,10 @@ describe("renderConfig", () => {
       })
     );
 
-    expect(result.yaml).toContain("节点A Alpha");
-    expect(result.yaml).toContain("节点B Beta");
+    expect(result.yaml).toContain("Alpha");
+    expect(result.yaml).toContain("Beta");
+    expect(result.yaml).not.toContain("节点A Alpha");
+    expect(result.yaml).not.toContain("节点B Beta");
     expect(subscriptionCache.fetchSubscription).not.toHaveBeenCalled();
   });
 
@@ -478,7 +481,7 @@ describe("renderConfig", () => {
       env,
       createConfig({
         sources: {
-          subscriptions: [{ url: `https://app.example.com/s/${linkA.id}`, prefix: "B" }],
+          subscriptions: [{ url: `https://app.example.com/s/${linkA.id}`, remark: "B" }],
           nodes: []
         }
       })
@@ -489,7 +492,7 @@ describe("renderConfig", () => {
       linkA.id,
       createConfig({
         sources: {
-          subscriptions: [{ url: `https://app.example.com/s/${linkB.id}`, prefix: "A" }],
+          subscriptions: [{ url: `https://app.example.com/s/${linkB.id}`, remark: "A" }],
           nodes: []
         }
       })

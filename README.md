@@ -4,11 +4,9 @@
 一个基于 Cloudflare Workers 的私有订阅聚合与转换工具，支持将多个订阅和单节点聚合统一收口成一份可复用的 Clash / Clash.Meta 配置
 
 </div>
-<div align="right">
-本项目基于 <a href="https://github.com/bestnite/sub2clash" target="_blank">bestnite/sub2clash</a>，90% 由 AI 重新开发
-</div>
 
 ## 演示
+
 ```
 演示地址：https://sub2clash-example.tokin.workers.dev
 演示密码：eXample123456
@@ -121,4 +119,4 @@ bun run dev
 
 ## 鸣谢
 
-本项目基于 <a href="https://github.com/bestnite/sub2clash" target="_blank">bestnite/sub2clash</a>，90% 由 AI 重新开发
+本项目基于 <a href="https://github.com/bestnite/sub2clash" target="_blank">bestnite/sub2clash</a> 由 AI 驱动二次开发

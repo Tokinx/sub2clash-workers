@@ -29,7 +29,7 @@ export function createEmptyRule() {
 }
 
 export function createEmptySubscription() {
-  return { url: "", prefix: "" };
+  return { url: "", remark: "" };
 }
 
 export function cleanSubscriptions(items) {
@@ -279,7 +279,7 @@ export function SubscriptionEditor({ subscriptions, onChange }) {
           <TableHeader>
             <TableRow>
               <TableHead>订阅地址</TableHead>
-              <TableHead className="w-[14rem]">节点前缀</TableHead>
+              <TableHead className="w-[14rem]">备注</TableHead>
               <TableHead className="w-[5rem] text-center">操作</TableHead>
             </TableRow>
           </TableHeader>
@@ -300,12 +300,12 @@ export function SubscriptionEditor({ subscriptions, onChange }) {
                 </TableCell>
                 <TableCell>
                   <TableTextInput
-                    value={item.prefix}
-                    aria-label="节点前缀"
-                    placeholder="可选，用于区分不同节点"
+                    value={item.remark || ""}
+                    aria-label="备注"
+                    placeholder="可选，仅用于管理记录"
                     onChange={(event) => {
                       const next = [...rows];
-                      next[index] = { ...next[index], prefix: event.target.value };
+                      next[index] = { ...next[index], remark: event.target.value };
                       onChange(next);
                     }}
                   />

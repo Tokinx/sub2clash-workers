@@ -26,10 +26,40 @@ describe("validateAndNormalizeConfig", () => {
     });
 
     expect(config.options.userAgent).toBe("");
+    expect(config.sources.subscriptions).toEqual([
+      { url: "https://example.com/sub", remark: "" }
+    ]);
     expect(config.override).toEqual({
       type: "yaml",
       content: ""
     });
+  });
+
+  it("兼容历史 prefix 字段并归一化为 remark", () => {
+    const config = validateAndNormalizeConfig({
+      target: "meta",
+      sources: {
+        subscriptions: [{ url: "https://example.com/sub", prefix: "旧前缀" }],
+        nodes: []
+      },
+      template: {
+        mode: "builtin",
+        value: "meta-default"
+      },
+      routing: {
+        ruleProviders: [],
+        rules: []
+      },
+      transforms: {
+        filterRegex: "",
+        replacements: []
+      },
+      options: {}
+    });
+
+    expect(config.sources.subscriptions).toEqual([
+      { url: "https://example.com/sub", remark: "旧前缀" }
+    ]);
   });
 
   it("仅接受 yaml 类型的 override", () => {

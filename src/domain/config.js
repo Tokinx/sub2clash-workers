@@ -42,7 +42,12 @@ export function validateAndNormalizeConfig(input) {
     }
     return {
       url: url.toString(),
-      prefix: typeof item.prefix === "string" ? item.prefix.trim() : ""
+      remark:
+        typeof item.remark === "string"
+          ? item.remark.trim()
+          : typeof item.prefix === "string"
+            ? item.prefix.trim()
+            : ""
     };
   });
 

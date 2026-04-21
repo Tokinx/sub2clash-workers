@@ -160,16 +160,6 @@ function ensureTemplateShape(templateObject) {
   };
 }
 
-function applyPrefix(proxies, prefix) {
-  if (!prefix) {
-    return proxies;
-  }
-  return proxies.map((proxy) => ({
-    ...proxy,
-    name: `${prefix} ${proxy.name}`.trim()
-  }));
-}
-
 function dedupeProxies(proxies) {
   const seen = new Set();
   const result = [];
@@ -381,7 +371,7 @@ async function collectRemoteProxies(env, request, config, context) {
       }
     }
 
-    const proxies = applyPrefix(parseSubscriptionBody(payload.body, config.options), subscription.prefix);
+    const proxies = parseSubscriptionBody(payload.body, config.options);
     result.push(...proxies);
 
     if (index === 0 && config.sources.subscriptions.length === 1) {

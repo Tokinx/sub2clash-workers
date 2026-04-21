@@ -21,6 +21,7 @@
 
 ### `config` 关键字段
 
+- `sources.subscriptions[].remark`：订阅源备注，仅用于管理台记录，不参与节点名渲染
 - `override.type`：当前仅支持 `yaml`
 - `override.content`：YAML 覆写文本，随 `/api/render`、短链配置和长链接 payload 一起传递
 - `override.content` 同时支持基础 merge 语法和项目自定义的 `$patches` / `$select` 扩展

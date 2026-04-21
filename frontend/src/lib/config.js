@@ -36,7 +36,7 @@ export function createEmptyConfig() {
   return {
     target: "meta",
     sources: {
-      subscriptions: [{ url: "", prefix: "" }],
+      subscriptions: [{ url: "", remark: "" }],
       nodes: []
     },
     template: {
@@ -70,6 +70,17 @@ export function createEmptyConfig() {
 
 export function normalizeConfig(config = {}) {
   const fallback = createEmptyConfig();
+  const normalizedSubscriptions = Array.isArray(config.sources?.subscriptions)
+    ? config.sources.subscriptions.map((item) => ({
+        url: typeof item?.url === "string" ? item.url : "",
+        remark:
+          typeof item?.remark === "string"
+            ? item.remark
+            : typeof item?.prefix === "string"
+              ? item.prefix
+              : ""
+      }))
+    : fallback.sources.subscriptions;
 
   return {
     ...fallback,
@@ -77,9 +88,7 @@ export function normalizeConfig(config = {}) {
     sources: {
       ...fallback.sources,
       ...(config.sources || {}),
-      subscriptions: Array.isArray(config.sources?.subscriptions)
-        ? config.sources.subscriptions
-        : fallback.sources.subscriptions,
+      subscriptions: normalizedSubscriptions,
       nodes: Array.isArray(config.sources?.nodes) ? config.sources.nodes : fallback.sources.nodes
     },
     template: {
