@@ -400,3 +400,20 @@
   - 前端 5 个测试文件、8 个测试用例通过
 - 现存风险：
   - 既有 KV 里的短链配置仍可能保留原始 `prefix` 字段，当前依赖运行时兼容读取；若后续需要统一存量数据，需额外设计迁移脚本
+
+## 表格编辑焦点回归 2026-04-26 19:47 CST
+
+- 状态：已完成
+- 目标：修复配置器各表格行使用首列字段作为 React key，导致编辑首列时输入框重挂载并丢失焦点的问题
+- 变更：
+  - `frontend/src/components/dashboard/editors.jsx` 新增前端本地稳定行 key 管理，行身份不再依赖 `url`、`name`、`value`、`pattern` 等可编辑业务字段
+  - 表格增删改统一走稳定行操作函数，删除中间行时同步移除对应本地 key，避免内部状态错配
+  - 新增 `frontend/src/components/dashboard/editors.test.jsx`，覆盖订阅、Rule Provider、规则、替换四类表格首列输入后的焦点保持
+- 测试：
+  - `bun run test:frontend`
+  - `bun run build:frontend`
+- 结果：
+  - 前端 6 个测试文件、12 个测试用例通过
+  - 前端生产构建通过，未改变保存配置的数据结构
+- 现存风险：
+  - Vite 生产构建仍提示主包体积超过 500 kB，本次未处理拆包

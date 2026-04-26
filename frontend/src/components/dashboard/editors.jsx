@@ -47,6 +47,64 @@ function ensureTableRow(items, createItem) {
   return items.length ? items : [createItem()];
 }
 
+let tableRowKeySeed = 0;
+
+function createTableRowKey() {
+  tableRowKeySeed += 1;
+  return `table-row-${tableRowKeySeed}`;
+}
+
+function syncRowKeys(keys, rowCount) {
+  while (keys.length < rowCount) {
+    keys.push(createTableRowKey());
+  }
+
+  if (keys.length > rowCount) {
+    keys.splice(rowCount);
+  }
+}
+
+function useStableTableRows(items, createItem, onChange) {
+  const fallbackRowRef = useRef(null);
+  const rowKeysRef = useRef([]);
+
+  if (!fallbackRowRef.current) {
+    fallbackRowRef.current = createItem();
+  }
+
+  const rows = ensureTableRow(items, () => fallbackRowRef.current);
+  syncRowKeys(rowKeysRef.current, rows.length);
+
+  function updateRow(index, values) {
+    const next = [...rows];
+    next[index] = { ...next[index], ...values };
+    onChange(next);
+  }
+
+  function addRow() {
+    rowKeysRef.current.push(createTableRowKey());
+    onChange([...rows, createItem()]);
+  }
+
+  function deleteRow(index) {
+    if (rows.length <= 1) {
+      return;
+    }
+
+    rowKeysRef.current.splice(index, 1);
+    onChange(rows.filter((_, rowIndex) => rowIndex !== index));
+  }
+
+  return {
+    rows,
+    rowKeys: rowKeysRef.current,
+    canDelete: rows.length > 1,
+    updateRow,
+    addRow,
+    deleteRow,
+  };
+}
+
 function SectionHeading({ eyebrow, title, description }) {
   return (
     <div className="mb-5">
@@ -269,8 +327,11 @@ function BehaviorCombobox({ value, onChange, placeholder = "选择或输入行�
 }
 
 export function SubscriptionEditor({ subscriptions, onChange }) {
-  const rows = ensureTableRow(subscriptions, createEmptySubscription);
-  const canDelete = rows.length > 1;
+  const { rows, rowKeys, canDelete, updateRow, addRow, deleteRow } = useStableTableRows(
+    subscriptions,
+    createEmptySubscription,
+    onChange,
+  );
 
   return (
     <div>
@@ -285,17 +346,13 @@ export function SubscriptionEditor({ subscriptions, onChange }) {
           </TableHeader>
           <TableBody>
             {rows.map((item, index) => (
-              <TableRow key={`${item.url}-${index}`}>
+              <TableRow key={rowKeys[index]}>
                 <TableCell>
                   <TableTextInput
                     value={item.url}
                     aria-label="订阅地址"
                     placeholder="https://example.com/subscription"
-                    onChange={(event) => {
-                      const next = [...rows];
-                      next[index] = { ...next[index], url: event.target.value };
-                      onChange(next);
-                    }}
+                    onChange={(event) => updateRow(index, { url: event.target.value })}
                   />
                 </TableCell>
                 <TableCell>
@@ -303,18 +360,14 @@ export function SubscriptionEditor({ subscriptions, onChange }) {
                     value={item.remark || ""}
                     aria-label="备注"
                     placeholder="可选，仅用于管理记录"
-                    onChange={(event) => {
-                      const next = [...rows];
-                      next[index] = { ...next[index], remark: event.target.value };
-                      onChange(next);
-                    }}
+                    onChange={(event) => updateRow(index, { remark: event.target.value })}
                   />
                 </TableCell>
                 <TableCell className="text-center">
                   <IconActionButton
                     label="删除订阅"
                     disabled={!canDelete}
-                    onClick={() => canDelete && onChange(rows.filter((_, rowIndex) => rowIndex !== index))}
+                    onClick={() => deleteRow(index)}
                   />
                 </TableCell>
               </TableRow>
@@ -323,14 +376,17 @@ export function SubscriptionEditor({ subscriptions, onChange }) {
         </Table>
       </TableFrame>
 
-      <AddRowButton ariaLabel="新增订阅" onClick={() => onChange([...rows, createEmptySubscription()])} />
+      <AddRowButton ariaLabel="新增订阅" onClick={addRow} />
     </div>
   );
 }
 
 export function RuleProviderEditor({ providers, onChange }) {
-  const rows = ensureTableRow(providers, createEmptyRuleProvider);
-  const canDelete = rows.length > 1;
+  const { rows, rowKeys, canDelete, updateRow, addRow, deleteRow } = useStableTableRows(
+    providers,
+    createEmptyRuleProvider,
+    onChange,
+  );
 
   return (
     <div>
@@ -348,17 +404,13 @@ export function RuleProviderEditor({ providers, onChange }) {
           </TableHeader>
           <TableBody>
             {rows.map((item, index) => (
-              <TableRow key={`${item.name}-${index}`}>
+              <TableRow key={rowKeys[index]}>
                 <TableCell>
                   <TableTextInput
                     value={item.name}
                     aria-label="名称"
                     placeholder="规则名称"
-                    onChange={(event) => {
-                      const next = [...rows];
-                      next[index] = { ...next[index], name: event.target.value };
-                      onChange(next);
-                    }}
+                    onChange={(event) => updateRow(index, { name: event.target.value })}
                   />
                 </TableCell>
                 <TableCell>
@@ -366,21 +418,13 @@ export function RuleProviderEditor({ providers, onChange }) {
                     value={item.group}
                     aria-label="策略组"
                     placeholder="节点选择"
-                    onChange={(event) => {
-                      const next = [...rows];
-                      next[index] = { ...next[index], group: event.target.value };
-                      onChange(next);
-                    }}
+                    onChange={(event) => updateRow(index, { group: event.target.value })}
                   />
                 </TableCell>
                 <TableCell>
                   <BehaviorCombobox
                     value={item.behavior}
-                    onChange={(value) => {
-                      const next = [...rows];
-                      next[index] = { ...next[index], behavior: value };
-                      onChange(next);
-                    }}
+                    onChange={(value) => updateRow(index, { behavior: value })}
                   />
                 </TableCell>
                 <TableCell>
@@ -388,29 +432,21 @@ export function RuleProviderEditor({ providers, onChange }) {
                     value={item.url}
                     aria-label="Rule Provider URL"
                     placeholder="https://example.com/provider.yaml"
-                    onChange={(event) => {
-                      const next = [...rows];
-                      next[index] = { ...next[index], url: event.target.value };
-                      onChange(next);
-                    }}
+                    onChange={(event) => updateRow(index, { url: event.target.value })}
                   />
                 </TableCell>
                 <TableCell className="text-center">
                   <CompactSwitch
                     label="插入到规则前部"
                     checked={Boolean(item.prepend)}
-                    onCheckedChange={(checked) => {
-                      const next = [...rows];
-                      next[index] = { ...next[index], prepend: checked };
-                      onChange(next);
-                    }}
+                    onCheckedChange={(checked) => updateRow(index, { prepend: checked })}
                   />
                 </TableCell>
                 <TableCell className="text-center">
                   <IconActionButton
                     label="删除订阅规则"
                     disabled={!canDelete}
-                    onClick={() => canDelete && onChange(rows.filter((_, rowIndex) => rowIndex !== index))}
+                    onClick={() => deleteRow(index)}
                   />
                 </TableCell>
               </TableRow>
@@ -419,14 +455,17 @@ export function RuleProviderEditor({ providers, onChange }) {
         </Table>
       </TableFrame>
 
-      <AddRowButton ariaLabel="新增 Rule Provider" onClick={() => onChange([...rows, createEmptyRuleProvider()])} />
+      <AddRowButton ariaLabel="新增 Rule Provider" onClick={addRow} />
     </div>
   );
 }
 
 export function RulesEditor({ rules, onChange }) {
-  const rows = ensureTableRow(rules, createEmptyRule);
-  const canDelete = rows.length > 1;
+  const { rows, rowKeys, canDelete, updateRow, addRow, deleteRow } = useStableTableRows(
+    rules,
+    createEmptyRule,
+    onChange,
+  );
 
   return (
     <div>
@@ -441,35 +480,27 @@ export function RulesEditor({ rules, onChange }) {
           </TableHeader>
           <TableBody>
             {rows.map((item, index) => (
-              <TableRow key={`${item.value}-${index}`}>
+              <TableRow key={rowKeys[index]}>
                 <TableCell>
                   <TableTextInput
                     value={item.value}
                     aria-label="规则"
                     placeholder="DOMAIN-SUFFIX,openai.com,DIRECT"
-                    onChange={(event) => {
-                      const next = [...rows];
-                      next[index] = { ...next[index], value: event.target.value };
-                      onChange(next);
-                    }}
+                    onChange={(event) => updateRow(index, { value: event.target.value })}
                   />
                 </TableCell>
                 <TableCell className="text-center">
                   <CompactSwitch
                     label="置顶"
                     checked={Boolean(item.prepend)}
-                    onCheckedChange={(checked) => {
-                      const next = [...rows];
-                      next[index] = { ...next[index], prepend: checked };
-                      onChange(next);
-                    }}
+                    onCheckedChange={(checked) => updateRow(index, { prepend: checked })}
                   />
                 </TableCell>
                 <TableCell className="text-center">
                   <IconActionButton
                     label="删除规则"
                     disabled={!canDelete}
-                    onClick={() => canDelete && onChange(rows.filter((_, rowIndex) => rowIndex !== index))}
+                    onClick={() => deleteRow(index)}
                   />
                 </TableCell>
               </TableRow>
@@ -478,14 +509,17 @@ export function RulesEditor({ rules, onChange }) {
         </Table>
       </TableFrame>
 
-      <AddRowButton ariaLabel="新增规则" onClick={() => onChange([...rows, createEmptyRule()])} />
+      <AddRowButton ariaLabel="新增规则" onClick={addRow} />
     </div>
   );
 }
 
 export function ReplacementEditor({ replacements, onChange }) {
-  const rows = ensureTableRow(replacements, createEmptyReplacement);
-  const canDelete = rows.length > 1;
+  const { rows, rowKeys, canDelete, updateRow, addRow, deleteRow } = useStableTableRows(
+    replacements,
+    createEmptyReplacement,
+    onChange,
+  );
 
   return (
     <div>
@@ -500,17 +534,13 @@ export function ReplacementEditor({ replacements, onChange }) {
           </TableHeader>
           <TableBody>
             {rows.map((item, index) => (
-              <TableRow key={`${item.pattern}-${index}`}>
+              <TableRow key={rowKeys[index]}>
                 <TableCell>
                   <TableTextInput
                     value={item.pattern}
                     aria-label="匹配正则"
                     placeholder="香港|HK"
-                    onChange={(event) => {
-                      const next = [...rows];
-                      next[index] = { ...next[index], pattern: event.target.value };
-                      onChange(next);
-                    }}
+                    onChange={(event) => updateRow(index, { pattern: event.target.value })}
                   />
                 </TableCell>
                 <TableCell>
@@ -518,18 +548,14 @@ export function ReplacementEditor({ replacements, onChange }) {
                     value={item.replacement}
                     aria-label="替换文本"
                     placeholder="Hong Kong"
-                    onChange={(event) => {
-                      const next = [...rows];
-                      next[index] = { ...next[index], replacement: event.target.value };
-                      onChange(next);
-                    }}
+                    onChange={(event) => updateRow(index, { replacement: event.target.value })}
                   />
                 </TableCell>
                 <TableCell className="text-center">
                   <IconActionButton
                     label="删除替换规则"
                     disabled={!canDelete}
-                    onClick={() => canDelete && onChange(rows.filter((_, rowIndex) => rowIndex !== index))}
+                    onClick={() => deleteRow(index)}
                   />
                 </TableCell>
               </TableRow>
@@ -538,7 +564,7 @@ export function ReplacementEditor({ replacements, onChange }) {
         </Table>
       </TableFrame>
 
-      <AddRowButton ariaLabel="新增替换规则" onClick={() => onChange([...rows, createEmptyReplacement()])} />
+      <AddRowButton ariaLabel="新增替换规则" onClick={addRow} />
     </div>
   );
 }
