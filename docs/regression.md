@@ -438,3 +438,27 @@
   - 新增覆盖订阅表格拖拽排序后的渲染顺序回归
 - 现存风险：
   - 当前实现基于浏览器原生 HTML Drag and Drop，桌面端体验优先；触屏端拖拽手感需后续用真实设备回归
+
+## 自动添加旗帜回归 2026-06-01 15:01 CST
+
+- 状态：已完成
+- 目标：为配置器增加“自动添加旗帜”开关，开启后按节点名识别国家/地区并补齐 emoji 旗帜
+- 变更：
+  - 新增 `options.autoFlag`，默认关闭，长链接、短链接和预览 payload 均会保留该选项
+  - `src/domain/country.js` 为现有国家/地区识别规则补充旗帜映射，并在节点名已包含 emoji 旗帜时跳过
+  - `src/domain/render.js` 在过滤、替换、名称去重之后补齐旗帜，并再次确保节点名唯一
+  - Dashboard 选项区新增“自动添加旗帜”开关，沿用当前 shadcn Switch 与暖纸张视觉风格
+  - 前端 Vitest include 扩展到 `.test.js`，让纯 JS 配置 helper 测试纳入回归
+- 测试：
+  - `bun run test:worker -- tests/unit/config.test.js tests/unit/render.test.js`
+  - `bun run test:frontend`
+  - `bun run test:worker`
+  - `bun run build:frontend`
+  - `bun run test`
+- 结果：
+  - Worker 侧 6 个测试文件、42 个测试用例通过
+  - 前端 7 个测试文件、16 个测试用例通过
+  - 前端生产构建通过，未改变已有配置字段含义
+  - 新增覆盖默认关闭、开启后补旗帜、已有旗帜不重复添加和前端预览 payload 携带开关
+- 现存风险：
+  - 国家/地区识别仍沿用当前轻量关键词表，未命中的节点不会自动补旗帜

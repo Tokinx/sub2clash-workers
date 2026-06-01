@@ -9,7 +9,7 @@ import { badRequest, notFound, unprocessable } from "../utils/errors.js";
 import { deepClean, stableStringify } from "../utils/object.js";
 import { loadBuiltinTemplate } from "./builtin-templates.js";
 import { validateAndNormalizeConfig } from "./config.js";
-import { detectCountryName, resolveCountryByCode } from "./country.js";
+import { addCountryFlagToName, detectCountryName, resolveCountryByCode } from "./country.js";
 import { filterSupportedProxies, parseProxyLink, parseSubscriptionBody } from "./parsers/index.js";
 import { applyYamlOverride } from "./yaml-override.js";
 
@@ -198,8 +198,12 @@ function applyFilterAndReplace(proxies, config) {
     }));
   }
 
+  return uniquifyProxyNames(next);
+}
+
+function uniquifyProxyNames(proxies) {
   const counts = new Map();
-  return next.map((proxy) => {
+  return proxies.map((proxy) => {
     const key = proxy.name.trim();
     const count = counts.get(key) || 0;
     counts.set(key, count + 1);
@@ -208,6 +212,19 @@ function applyFilterAndReplace(proxies, config) {
       name: count === 0 ? key : `${key} ${count}`
     };
   });
+}
+
+function applyCountryFlags(proxies, options) {
+  if (!options.autoFlag) {
+    return proxies;
+  }
+
+  return uniquifyProxyNames(
+    proxies.map((proxy) => ({
+      ...proxy,
+      name: addCountryFlagToName(proxy.name)
+    }))
+  );
 }
 
 function buildCountryGroups(proxies, options) {
@@ -402,6 +419,7 @@ export async function renderConfig(env, request, inputConfig, context) {
     proxies = filterSupportedProxies(proxies, config.target);
     proxies = dedupeProxies(proxies);
     proxies = applyFilterAndReplace(proxies, config);
+    proxies = applyCountryFlags(proxies, config.options);
 
     const countryGroups = buildCountryGroups(proxies, config.options);
     const warnings = [];

@@ -141,6 +141,7 @@ describe("DashboardPage", () => {
     expect(overrideInput).toHaveValue("rules:\n  - MATCH\n  - DIRECT\n");
 
     await user.click(screen.getByRole("switch", { name: /仅输出节点列表/i }));
+    await user.click(screen.getByRole("switch", { name: /自动添加旗帜/i }));
 
     await user.click(screen.getByRole("button", { name: /预览 YAML/i }));
 
@@ -157,6 +158,7 @@ describe("DashboardPage", () => {
       content: "rules:\n  - MATCH\n  - DIRECT\n"
     });
     expect(renderPayload.options.nodeList).toBe(true);
+    expect(renderPayload.options.autoFlag).toBe(true);
 
     expect(await screen.findByText("输出预览")).toBeInTheDocument();
     expect(screen.getByText("proxies: []", { exact: false })).toBeInTheDocument();

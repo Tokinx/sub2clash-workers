@@ -536,6 +536,17 @@ export default function DashboardPage({ templates }) {
                 }
               />
               <OptionToggle
+                label="自动添加旗帜"
+                description="启用后会按节点名识别国家或地区，并为未包含旗帜的节点补齐 emoji 旗帜。"
+                checked={Boolean(config.options.autoFlag)}
+                onCheckedChange={(value) =>
+                  setConfig((current) => ({
+                    ...current,
+                    options: { ...current.options, autoFlag: value },
+                  }))
+                }
+              />
+              <OptionToggle
                 label="启用 UDP"
                 description="启用后会在 Clash.Meta 中启用 UDP 转发功能，适合需要 UDP 支持的用户。"
                 checked={Boolean(config.options.useUDP)}

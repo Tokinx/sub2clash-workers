@@ -2,6 +2,29 @@ import { describe, expect, it } from "vitest";
 
 import { validateAndNormalizeConfig } from "../../src/domain/config.js";
 
+function createValidPayload(options = {}) {
+  return {
+    target: "meta",
+    sources: {
+      subscriptions: [{ url: "https://example.com/sub" }],
+      nodes: []
+    },
+    template: {
+      mode: "builtin",
+      value: "meta-default"
+    },
+    routing: {
+      ruleProviders: [],
+      rules: []
+    },
+    transforms: {
+      filterRegex: "",
+      replacements: []
+    },
+    options
+  };
+}
+
 describe("validateAndNormalizeConfig", () => {
   it("默认不注入 User-Agent", () => {
     const config = validateAndNormalizeConfig({
@@ -26,6 +49,7 @@ describe("validateAndNormalizeConfig", () => {
     });
 
     expect(config.options.userAgent).toBe("");
+    expect(config.options.autoFlag).toBe(false);
     expect(config.sources.subscriptions).toEqual([
       { url: "https://example.com/sub", remark: "" }
     ]);
@@ -60,6 +84,11 @@ describe("validateAndNormalizeConfig", () => {
     expect(config.sources.subscriptions).toEqual([
       { url: "https://example.com/sub", remark: "旧前缀" }
     ]);
+  });
+
+  it("仅布尔 true 会开启自动添加旗帜", () => {
+    expect(validateAndNormalizeConfig(createValidPayload({ autoFlag: true })).options.autoFlag).toBe(true);
+    expect(validateAndNormalizeConfig(createValidPayload({ autoFlag: "false" })).options.autoFlag).toBe(false);
   });
 
   it("仅接受 yaml 类型的 override", () => {

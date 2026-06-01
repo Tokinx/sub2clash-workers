@@ -91,3 +91,10 @@
 - 支持用 override 对对象数组做 `merge / replace / remove / upsert`，覆盖“前置节点 + dialer-proxy”这类声明式场景
 - 补充完整 override 文档，并让 override 新增的 `proxy-groups` 也支持占位符展开
 - 状态：已完成
+
+## Phase 15
+
+- 为配置器增加自动添加旗帜开关
+- 渲染层按现有国家/地区识别规则为未包含旗帜的节点补齐 emoji 旗帜
+- 补充 Worker 与前端回归，确保长链接、短链和预览都能保留该配置项
+- 状态：已完成

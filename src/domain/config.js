@@ -7,6 +7,7 @@ const DEFAULT_OPTIONS = {
   sort: "nameasc",
   nodeList: false,
   ignoreCountryGroup: false,
+  autoFlag: false,
   userAgent: "",
   useUDP: false
 };
@@ -140,6 +141,7 @@ export function validateAndNormalizeConfig(input) {
   if (!VALID_SORTS.has(options.sort)) {
     options.sort = DEFAULT_OPTIONS.sort;
   }
+  options.autoFlag = options.autoFlag === true;
 
   return {
     target,

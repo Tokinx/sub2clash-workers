@@ -108,6 +108,29 @@ describe("renderConfig", () => {
     expect(result.stats.proxyCount).toBe(2);
   });
 
+  it("开启自动旗帜时会补齐未带旗帜的节点名且不重复添加", async () => {
+    const env = createEnv();
+    const result = await renderConfig(env, new Request("https://app.example.com/"), createConfig({
+      sources: {
+        subscriptions: [],
+        nodes: [
+          "ss://YWVzLTI1Ni1nY206cGFzc0BleGFtcGxlLmNvbTo4NDQz#香港入口",
+          "trojan://secret@example.com:443#🇺🇸 美国入口",
+          "trojan://secret2@example.net:443#未知节点"
+        ]
+      },
+      options: {
+        autoFlag: true
+      }
+    }));
+
+    const proxyNames = YAML.parse(result.yaml).proxies.map((proxy) => proxy.name);
+    expect(proxyNames).toContain("🇭🇰 香港入口");
+    expect(proxyNames).toContain("🇺🇸 美国入口");
+    expect(proxyNames).toContain("未知节点");
+    expect(proxyNames).not.toContain("🇺🇸 🇺🇸 美国入口");
+  });
+
   it("在 clash 目标下会剔除 meta only 协议", async () => {
     const env = createEnv();
     const result = await renderConfig(env, new Request("https://app.example.com/"), {

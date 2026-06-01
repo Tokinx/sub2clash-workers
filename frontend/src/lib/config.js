@@ -62,6 +62,7 @@ export function createEmptyConfig() {
       sort: "nameasc",
       nodeList: false,
       ignoreCountryGroup: false,
+      autoFlag: false,
       userAgent: "",
       useUDP: false
     }
@@ -70,6 +71,12 @@ export function createEmptyConfig() {
 
 export function normalizeConfig(config = {}) {
   const fallback = createEmptyConfig();
+  const normalizedOptions = {
+    ...fallback.options,
+    ...(config.options || {})
+  };
+  normalizedOptions.autoFlag = normalizedOptions.autoFlag === true;
+
   const normalizedSubscriptions = Array.isArray(config.sources?.subscriptions)
     ? config.sources.subscriptions.map((item) => ({
         url: typeof item?.url === "string" ? item.url : "",
@@ -115,8 +122,7 @@ export function normalizeConfig(config = {}) {
       ...(config.override || {})
     },
     options: {
-      ...fallback.options,
-      ...(config.options || {})
+      ...normalizedOptions
     }
   };
 }
