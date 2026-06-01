@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { vi } from "vitest";
 
 import {
   ReplacementEditor,
@@ -11,6 +12,16 @@ import {
 
 function SubscriptionHarness() {
   const [subscriptions, setSubscriptions] = useState([{ url: "", remark: "" }]);
+  return <SubscriptionEditor subscriptions={subscriptions} onChange={setSubscriptions} />;
+}
+
+function SubscriptionDragHarness() {
+  const [subscriptions, setSubscriptions] = useState([
+    { url: "https://example.com/source-a", remark: "A" },
+    { url: "https://example.com/source-b", remark: "B" },
+    { url: "https://example.com/source-c", remark: "C" },
+  ]);
+
   return <SubscriptionEditor subscriptions={subscriptions} onChange={setSubscriptions} />;
 }
 
@@ -48,5 +59,29 @@ describe("dashboard table editors", () => {
     expect(currentInput).toBe(input);
     expect(currentInput).toHaveFocus();
     expect(currentInput).toHaveValue(value);
+  });
+
+  it("订阅表格拖拽行后按新顺序渲染", () => {
+    const dataTransfer = {
+      dropEffect: "",
+      effectAllowed: "",
+      setData: vi.fn(),
+    };
+
+    render(<SubscriptionDragHarness />);
+
+    const handles = screen.getAllByRole("button", { name: /拖拽排序订阅第/ });
+    const targetRow = handles[2].closest("tr");
+
+    fireEvent.dragStart(handles[0], { dataTransfer });
+    fireEvent.dragEnter(targetRow, { dataTransfer });
+    fireEvent.dragOver(targetRow, { dataTransfer });
+    fireEvent.drop(targetRow, { dataTransfer });
+
+    expect(screen.getAllByRole("textbox", { name: "订阅地址" }).map((input) => input.value)).toEqual([
+      "https://example.com/source-b",
+      "https://example.com/source-c",
+      "https://example.com/source-a",
+    ]);
   });
 });

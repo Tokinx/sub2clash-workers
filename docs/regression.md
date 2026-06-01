@@ -417,3 +417,24 @@
   - 前端生产构建通过，未改变保存配置的数据结构
 - 现存风险：
   - Vite 生产构建仍提示主包体积超过 500 kB，本次未处理拆包
+
+## 表格拖拽排序回归 2026-06-01 14:34 CST
+
+- 状态：已完成
+- 目标：为配置器中的数组型表格增加拖拽排序，保留现有字段结构与保存语义
+- 变更：
+  - `frontend/src/components/dashboard/editors.jsx` 在稳定行 key 管理中加入行重排逻辑，拖拽时同步移动本地 key 与业务行数据
+  - 订阅、Rule Provider、规则、替换规则四类表格新增统一的排序把手列
+  - 拖拽状态使用当前陶土色系高亮，不改变已有表格布局和数据模型
+- 测试：
+  - `cd frontend && bun run test -- src/components/dashboard/editors.test.jsx`
+  - `bun run test:frontend`
+  - `bun run build:frontend`
+  - `bun run test`
+- 结果：
+  - Worker 侧 6 个测试文件、40 个测试用例通过
+  - 前端 6 个测试文件、13 个测试用例通过
+  - 前端生产构建通过，未改变保存配置的数据结构
+  - 新增覆盖订阅表格拖拽排序后的渲染顺序回归
+- 现存风险：
+  - 当前实现基于浏览器原生 HTML Drag and Drop，桌面端体验优先；触屏端拖拽手感需后续用真实设备回归

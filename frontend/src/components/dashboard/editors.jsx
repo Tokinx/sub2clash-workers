@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, ChevronsUpDown, Plus, Trash2 } from "lucide-react";
+import { Check, ChevronsUpDown, GripVertical, Plus, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandItem, CommandList } from "@/components/ui/command";
@@ -67,6 +67,8 @@ function syncRowKeys(keys, rowCount) {
 function useStableTableRows(items, createItem, onChange) {
   const fallbackRowRef = useRef(null);
   const rowKeysRef = useRef([]);
+  const draggingIndexRef = useRef(null);
+  const [dragState, setDragState] = useState({ sourceIndex: null, targetIndex: null });
 
   if (!fallbackRowRef.current) {
     fallbackRowRef.current = createItem();
@@ -95,13 +97,74 @@ function useStableTableRows(items, createItem, onChange) {
     onChange(rows.filter((_, rowIndex) => rowIndex !== index));
   }
 
+  function reorderRow(sourceIndex, targetIndex) {
+    if (
+      sourceIndex === targetIndex ||
+      sourceIndex < 0 ||
+      targetIndex < 0 ||
+      sourceIndex >= rows.length ||
+      targetIndex >= rows.length
+    ) {
+      return;
+    }
+
+    const nextRows = [...rows];
+    const [movedRow] = nextRows.splice(sourceIndex, 1);
+    nextRows.splice(targetIndex, 0, movedRow);
+
+    const [movedKey] = rowKeysRef.current.splice(sourceIndex, 1);
+    rowKeysRef.current.splice(targetIndex, 0, movedKey);
+
+    onChange(nextRows);
+  }
+
+  function startRowDrag(index) {
+    if (rows.length <= 1) {
+      return;
+    }
+
+    draggingIndexRef.current = index;
+    setDragState({ sourceIndex: index, targetIndex: index });
+  }
+
+  function enterRowDrag(index) {
+    if (draggingIndexRef.current === null) {
+      return;
+    }
+
+    const sourceIndex = draggingIndexRef.current;
+    setDragState((current) =>
+      current.targetIndex === index ? current : { sourceIndex, targetIndex: index },
+    );
+  }
+
+  function endRowDrag() {
+    draggingIndexRef.current = null;
+    setDragState({ sourceIndex: null, targetIndex: null });
+  }
+
+  function dropRow(index) {
+    const sourceIndex = draggingIndexRef.current;
+    if (sourceIndex !== null) {
+      reorderRow(sourceIndex, index);
+    }
+
+    endRowDrag();
+  }
+
   return {
     rows,
     rowKeys: rowKeysRef.current,
     canDelete: rows.length > 1,
+    canReorder: rows.length > 1,
+    dragState,
     updateRow,
     addRow,
     deleteRow,
+    startRowDrag,
+    enterRowDrag,
+    dropRow,
+    endRowDrag,
   };
 }
 
@@ -138,6 +201,102 @@ function TableFrame({ minWidthClassName = "", children }) {
 
 function TableTextInput({ className = "", ...props }) {
   return <Input className={cn("bg-[rgba(255,255,255,0.88)]", className)} {...props} />;
+}
+
+function SortTableHead() {
+  return (
+    <TableHead className="w-[3.25rem] text-center">
+      <span className="sr-only">排序</span>
+    </TableHead>
+  );
+}
+
+function DragHandle({ label, index, disabled, onDragStart, onDragEnd }) {
+  return (
+    <Button
+      type="button"
+      aria-label={label}
+      variant="ghost"
+      size="icon"
+      draggable={!disabled}
+      disabled={disabled}
+      onDragStart={(event) => {
+        if (disabled) {
+          event.preventDefault();
+          return;
+        }
+
+        if (event.dataTransfer) {
+          event.dataTransfer.effectAllowed = "move";
+          event.dataTransfer.setData("text/plain", String(index));
+        }
+        onDragStart(index);
+      }}
+      onDragEnd={onDragEnd}
+      className="cursor-grab text-muted-foreground hover:text-foreground active:cursor-grabbing !h-6 !w-6"
+    >
+      <GripVertical className="h-4 w-4" />
+    </Button>
+  );
+}
+
+function SortableTableRow({
+  index,
+  canReorder,
+  dragState,
+  dragHandleLabel,
+  onDragStart,
+  onDragEnter,
+  onDrop,
+  onDragEnd,
+  children,
+}) {
+  const isDragging = dragState.sourceIndex === index;
+  const isDropTarget = dragState.targetIndex === index && dragState.sourceIndex !== index;
+
+  function handleDragOver(event) {
+    if (!canReorder) {
+      return;
+    }
+
+    event.preventDefault();
+    if (event.dataTransfer) {
+      event.dataTransfer.dropEffect = "move";
+    }
+    onDragEnter(index);
+  }
+
+  function handleDrop(event) {
+    if (!canReorder) {
+      return;
+    }
+
+    event.preventDefault();
+    onDrop(index);
+  }
+
+  return (
+    <TableRow
+      className={cn(
+        isDragging && "bg-[rgba(201,100,66,0.08)] opacity-55",
+        isDropTarget && "bg-[rgba(201,100,66,0.12)] shadow-[inset_0_2px_0_var(--brand)]",
+      )}
+      onDragEnter={() => onDragEnter(index)}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
+      <TableCell className="w-[3.25rem] text-center">
+        <DragHandle
+          label={dragHandleLabel}
+          index={index}
+          disabled={!canReorder}
+          onDragStart={onDragStart}
+          onDragEnd={onDragEnd}
+        />
+      </TableCell>
+      {children}
+    </TableRow>
+  );
 }
 
 function IconActionButton({ label, onClick, disabled = false, tone = "destructive" }) {
@@ -327,7 +486,20 @@ function BehaviorCombobox({ value, onChange, placeholder = "选择或输入行�
 }
 
 export function SubscriptionEditor({ subscriptions, onChange }) {
-  const { rows, rowKeys, canDelete, updateRow, addRow, deleteRow } = useStableTableRows(
+  const {
+    rows,
+    rowKeys,
+    canDelete,
+    canReorder,
+    dragState,
+    updateRow,
+    addRow,
+    deleteRow,
+    startRowDrag,
+    enterRowDrag,
+    dropRow,
+    endRowDrag,
+  } = useStableTableRows(
     subscriptions,
     createEmptySubscription,
     onChange,
@@ -335,10 +507,11 @@ export function SubscriptionEditor({ subscriptions, onChange }) {
 
   return (
     <div>
-      <TableFrame minWidthClassName="min-w-[42rem]">
+      <TableFrame minWidthClassName="min-w-[45rem]">
         <Table>
           <TableHeader>
             <TableRow>
+              <SortTableHead />
               <TableHead>订阅地址</TableHead>
               <TableHead className="w-[14rem]">备注</TableHead>
               <TableHead className="w-[5rem] text-center">操作</TableHead>
@@ -346,7 +519,17 @@ export function SubscriptionEditor({ subscriptions, onChange }) {
           </TableHeader>
           <TableBody>
             {rows.map((item, index) => (
-              <TableRow key={rowKeys[index]}>
+              <SortableTableRow
+                key={rowKeys[index]}
+                index={index}
+                canReorder={canReorder}
+                dragState={dragState}
+                dragHandleLabel={`拖拽排序订阅第 ${index + 1} 行`}
+                onDragStart={startRowDrag}
+                onDragEnter={enterRowDrag}
+                onDrop={dropRow}
+                onDragEnd={endRowDrag}
+              >
                 <TableCell>
                   <TableTextInput
                     value={item.url}
@@ -370,7 +553,7 @@ export function SubscriptionEditor({ subscriptions, onChange }) {
                     onClick={() => deleteRow(index)}
                   />
                 </TableCell>
-              </TableRow>
+              </SortableTableRow>
             ))}
           </TableBody>
         </Table>
@@ -382,7 +565,20 @@ export function SubscriptionEditor({ subscriptions, onChange }) {
 }
 
 export function RuleProviderEditor({ providers, onChange }) {
-  const { rows, rowKeys, canDelete, updateRow, addRow, deleteRow } = useStableTableRows(
+  const {
+    rows,
+    rowKeys,
+    canDelete,
+    canReorder,
+    dragState,
+    updateRow,
+    addRow,
+    deleteRow,
+    startRowDrag,
+    enterRowDrag,
+    dropRow,
+    endRowDrag,
+  } = useStableTableRows(
     providers,
     createEmptyRuleProvider,
     onChange,
@@ -390,10 +586,11 @@ export function RuleProviderEditor({ providers, onChange }) {
 
   return (
     <div>
-      <TableFrame minWidthClassName="min-w-[64rem]">
+      <TableFrame minWidthClassName="min-w-[67rem]">
         <Table>
           <TableHeader>
             <TableRow>
+              <SortTableHead />
               <TableHead>名称</TableHead>
               <TableHead>策略组</TableHead>
               <TableHead>行为</TableHead>
@@ -404,7 +601,17 @@ export function RuleProviderEditor({ providers, onChange }) {
           </TableHeader>
           <TableBody>
             {rows.map((item, index) => (
-              <TableRow key={rowKeys[index]}>
+              <SortableTableRow
+                key={rowKeys[index]}
+                index={index}
+                canReorder={canReorder}
+                dragState={dragState}
+                dragHandleLabel={`拖拽排序 Rule Provider 第 ${index + 1} 行`}
+                onDragStart={startRowDrag}
+                onDragEnter={enterRowDrag}
+                onDrop={dropRow}
+                onDragEnd={endRowDrag}
+              >
                 <TableCell>
                   <TableTextInput
                     value={item.name}
@@ -449,7 +656,7 @@ export function RuleProviderEditor({ providers, onChange }) {
                     onClick={() => deleteRow(index)}
                   />
                 </TableCell>
-              </TableRow>
+              </SortableTableRow>
             ))}
           </TableBody>
         </Table>
@@ -461,7 +668,20 @@ export function RuleProviderEditor({ providers, onChange }) {
 }
 
 export function RulesEditor({ rules, onChange }) {
-  const { rows, rowKeys, canDelete, updateRow, addRow, deleteRow } = useStableTableRows(
+  const {
+    rows,
+    rowKeys,
+    canDelete,
+    canReorder,
+    dragState,
+    updateRow,
+    addRow,
+    deleteRow,
+    startRowDrag,
+    enterRowDrag,
+    dropRow,
+    endRowDrag,
+  } = useStableTableRows(
     rules,
     createEmptyRule,
     onChange,
@@ -469,10 +689,11 @@ export function RulesEditor({ rules, onChange }) {
 
   return (
     <div>
-      <TableFrame minWidthClassName="min-w-[40rem]">
+      <TableFrame minWidthClassName="min-w-[43rem]">
         <Table>
           <TableHeader>
             <TableRow>
+              <SortTableHead />
               <TableHead>规则</TableHead>
               <TableHead className="w-[5rem] text-center">置顶</TableHead>
               <TableHead className="w-[5rem] text-center">操作</TableHead>
@@ -480,7 +701,17 @@ export function RulesEditor({ rules, onChange }) {
           </TableHeader>
           <TableBody>
             {rows.map((item, index) => (
-              <TableRow key={rowKeys[index]}>
+              <SortableTableRow
+                key={rowKeys[index]}
+                index={index}
+                canReorder={canReorder}
+                dragState={dragState}
+                dragHandleLabel={`拖拽排序规则第 ${index + 1} 行`}
+                onDragStart={startRowDrag}
+                onDragEnter={enterRowDrag}
+                onDrop={dropRow}
+                onDragEnd={endRowDrag}
+              >
                 <TableCell>
                   <TableTextInput
                     value={item.value}
@@ -503,7 +734,7 @@ export function RulesEditor({ rules, onChange }) {
                     onClick={() => deleteRow(index)}
                   />
                 </TableCell>
-              </TableRow>
+              </SortableTableRow>
             ))}
           </TableBody>
         </Table>
@@ -515,7 +746,20 @@ export function RulesEditor({ rules, onChange }) {
 }
 
 export function ReplacementEditor({ replacements, onChange }) {
-  const { rows, rowKeys, canDelete, updateRow, addRow, deleteRow } = useStableTableRows(
+  const {
+    rows,
+    rowKeys,
+    canDelete,
+    canReorder,
+    dragState,
+    updateRow,
+    addRow,
+    deleteRow,
+    startRowDrag,
+    enterRowDrag,
+    dropRow,
+    endRowDrag,
+  } = useStableTableRows(
     replacements,
     createEmptyReplacement,
     onChange,
@@ -523,10 +767,11 @@ export function ReplacementEditor({ replacements, onChange }) {
 
   return (
     <div>
-      <TableFrame minWidthClassName="min-w-[42rem]">
+      <TableFrame minWidthClassName="min-w-[45rem]">
         <Table>
           <TableHeader>
             <TableRow>
+              <SortTableHead />
               <TableHead>匹配正则</TableHead>
               <TableHead>替换文本</TableHead>
               <TableHead className="w-[5rem] text-center">操作</TableHead>
@@ -534,7 +779,17 @@ export function ReplacementEditor({ replacements, onChange }) {
           </TableHeader>
           <TableBody>
             {rows.map((item, index) => (
-              <TableRow key={rowKeys[index]}>
+              <SortableTableRow
+                key={rowKeys[index]}
+                index={index}
+                canReorder={canReorder}
+                dragState={dragState}
+                dragHandleLabel={`拖拽排序替换规则第 ${index + 1} 行`}
+                onDragStart={startRowDrag}
+                onDragEnter={enterRowDrag}
+                onDrop={dropRow}
+                onDragEnd={endRowDrag}
+              >
                 <TableCell>
                   <TableTextInput
                     value={item.pattern}
@@ -558,7 +813,7 @@ export function ReplacementEditor({ replacements, onChange }) {
                     onClick={() => deleteRow(index)}
                   />
                 </TableCell>
-              </TableRow>
+              </SortableTableRow>
             ))}
           </TableBody>
         </Table>
