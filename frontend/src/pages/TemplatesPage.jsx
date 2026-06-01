@@ -262,7 +262,7 @@ export default function TemplatesPage({ templates, refreshTemplates }) {
           }}
         />
         {message ? (
-          <Alert className="absolute bottom-2 left-2 right-2 w-auto text-sm bg-primary/5 border-primary/30 text-primary">
+          <Alert className="absolute bottom-2 left-2 right-2 w-auto text-sm bg-primary/5 border-primary/30 text-primary backdrop-blur-lg">
             <AlertDescription>{message}</AlertDescription>
           </Alert>
         ) : null}
