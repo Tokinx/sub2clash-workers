@@ -430,6 +430,19 @@ function applyPatches(baseConfig, patches) {
   return next;
 }
 
+export function applyParsedOverride(baseConfig, overrideObject, topLevelErrorMessage = "覆写对象顶层必须是对象") {
+  if (!isPlainObject(overrideObject)) {
+    throw unprocessable(topLevelErrorMessage);
+  }
+
+  const plainOverride = clone(overrideObject);
+  const patches = plainOverride.$patches;
+  delete plainOverride.$patches;
+
+  const merged = mergeObject(baseConfig, plainOverride);
+  return applyPatches(merged, patches);
+}
+
 export function applyYamlOverride(baseConfig, overrideContent) {
   if (!overrideContent.trim()) {
     return clone(baseConfig);
@@ -446,10 +459,5 @@ export function applyYamlOverride(baseConfig, overrideContent) {
     throw unprocessable("覆写 YAML 顶层必须是对象");
   }
 
-  const plainOverride = clone(overrideObject);
-  const patches = plainOverride.$patches;
-  delete plainOverride.$patches;
-
-  const merged = mergeObject(baseConfig, plainOverride);
-  return applyPatches(merged, patches);
+  return applyParsedOverride(baseConfig, overrideObject, "覆写 YAML 顶层必须是对象");
 }

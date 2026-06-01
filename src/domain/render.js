@@ -11,7 +11,7 @@ import { loadBuiltinTemplate } from "./builtin-templates.js";
 import { validateAndNormalizeConfig } from "./config.js";
 import { addCountryFlagToName, detectCountryName, resolveCountryByCode } from "./country.js";
 import { filterSupportedProxies, parseProxyLink, parseSubscriptionBody } from "./parsers/index.js";
-import { applyYamlOverride } from "./yaml-override.js";
+import { applyParsedOverride, applyYamlOverride } from "./yaml-override.js";
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -308,6 +308,91 @@ function appendRulesKeepingMatchLast(existingRules, rulesToAppend) {
   return [...rules, ...rulesToAppend];
 }
 
+function createRuleProviderConfig(provider) {
+  return {
+    type: "http",
+    behavior: provider.behavior,
+    url: provider.url,
+    path: `./providers/${provider.name}.yaml`,
+    interval: 3600
+  };
+}
+
+function hasRoutingEnhancements(routing) {
+  return routing.ruleProviders.length > 0 || routing.rules.length > 0;
+}
+
+function escapeOverrideKey(key) {
+  const value = String(key);
+  if (value.startsWith("+") || (value.startsWith("<") && value.endsWith(">"))) {
+    return `<${value}>`;
+  }
+  return value;
+}
+
+function replaceOverrideKey(key) {
+  return `${escapeOverrideKey(key)}!`;
+}
+
+function buildRoutingOverride(baseConfig, routing) {
+  if (!hasRoutingEnhancements(routing)) {
+    return {};
+  }
+
+  const override = {};
+  const prependRules = routing.rules.filter((rule) => rule.prepend).map((rule) => rule.value);
+  const appendRules = routing.rules.filter((rule) => !rule.prepend).map((rule) => rule.value);
+  const prependProviders = routing.ruleProviders.filter((item) => item.prepend);
+  const appendProviders = routing.ruleProviders.filter((item) => !item.prepend);
+
+  let rules = appendRulesKeepingMatchLast(
+    [...prependRules, ...(Array.isArray(baseConfig.rules) ? baseConfig.rules : [])],
+    appendRules
+  );
+
+  if (prependProviders.length > 0) {
+    rules = [
+      ...prependProviders.map((provider) => `RULE-SET,${provider.name},${provider.group}`),
+      ...rules
+    ];
+  }
+  if (appendProviders.length > 0) {
+    rules = appendRulesKeepingMatchLast(
+      rules,
+      appendProviders.map((provider) => `RULE-SET,${provider.name},${provider.group}`)
+    );
+  }
+
+  override["rules!"] = rules;
+
+  if (routing.ruleProviders.length > 0) {
+    override["rule-providers"] = Object.fromEntries(
+      [...prependProviders, ...appendProviders].map((provider) => [
+        replaceOverrideKey(provider.name),
+        createRuleProviderConfig(provider)
+      ])
+    );
+  }
+
+  return override;
+}
+
+function buildNodeListWarnings(config) {
+  const warnings = [];
+  const hasRouting = hasRoutingEnhancements(config.routing);
+  const hasOverride = config.override.content.trim().length > 0;
+
+  if (hasRouting && hasOverride) {
+    warnings.push("仅输出节点列表时已忽略规则增强与配置覆写");
+  } else if (hasRouting) {
+    warnings.push("仅输出节点列表时已忽略规则增强");
+  } else if (hasOverride) {
+    warnings.push("仅输出节点列表时已忽略覆写");
+  }
+
+  return warnings;
+}
+
 function mergeTemplate(templateContent, proxies, countryGroups, config) {
   let templateObject;
   try {
@@ -327,36 +412,6 @@ function mergeTemplate(templateContent, proxies, countryGroups, config) {
       ...next["proxy-groups"],
       ...countryGroups.map(({ __countryGroup, __size, ...group }) => group)
     ];
-  }
-
-  const prependRules = config.routing.rules.filter((rule) => rule.prepend).map((rule) => rule.value);
-  const appendRules = config.routing.rules.filter((rule) => !rule.prepend).map((rule) => rule.value);
-  next.rules = appendRulesKeepingMatchLast([...prependRules, ...next.rules], appendRules);
-
-  const prependProviders = config.routing.ruleProviders.filter((item) => item.prepend);
-  const appendProviders = config.routing.ruleProviders.filter((item) => !item.prepend);
-
-  for (const provider of [...prependProviders, ...appendProviders]) {
-    next["rule-providers"][provider.name] = {
-      type: "http",
-      behavior: provider.behavior,
-      url: provider.url,
-      path: `./providers/${provider.name}.yaml`,
-      interval: 3600
-    };
-  }
-
-  if (prependProviders.length > 0) {
-    next.rules = [
-      ...prependProviders.map((provider) => `RULE-SET,${provider.name},${provider.group}`),
-      ...next.rules
-    ];
-  }
-  if (appendProviders.length > 0) {
-    next.rules = appendRulesKeepingMatchLast(
-      next.rules,
-      appendProviders.map((provider) => `RULE-SET,${provider.name},${provider.group}`)
-    );
   }
 
   return next;
@@ -422,12 +477,8 @@ export async function renderConfig(env, request, inputConfig, context) {
     proxies = applyCountryFlags(proxies, config.options);
 
     const countryGroups = buildCountryGroups(proxies, config.options);
-    const warnings = [];
-
     if (config.options.nodeList) {
-      if (config.override.content.trim()) {
-        warnings.push("仅输出节点列表时已忽略覆写");
-      }
+      const warnings = buildNodeListWarnings(config);
 
       const yaml = YAML.stringify(
         deepClean({
@@ -447,6 +498,7 @@ export async function renderConfig(env, request, inputConfig, context) {
     }
 
     let merged = mergeTemplate(template.content, proxies, countryGroups, config);
+    merged = applyParsedOverride(merged, buildRoutingOverride(merged, config.routing));
     merged = applyYamlOverride(merged, config.override.content);
     if (Array.isArray(merged["proxy-groups"])) {
       const proxyNames = proxies.map((proxy) => proxy.name);
@@ -455,6 +507,7 @@ export async function renderConfig(env, request, inputConfig, context) {
       );
     }
     const yaml = YAML.stringify(deepClean(merged));
+    const warnings = [];
 
     return {
       yaml,

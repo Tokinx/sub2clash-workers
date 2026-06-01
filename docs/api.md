@@ -26,7 +26,7 @@
 - `override.content`：YAML 覆写文本，随 `/api/render`、短链配置和长链接 payload 一起传递
 - `override.content` 同时支持基础 merge 语法和项目自定义的 `$patches` / `$select` 扩展
 - `options.autoFlag`：默认 `false`；开启后会按节点名识别国家/地区并为未包含旗帜的节点名前缀对应 emoji 旗帜
-- 当 `options.nodeList = true` 且 `override.content` 非空时，接口仍正常返回 YAML，但 `warnings` 会包含“仅输出节点列表时已忽略覆写”
+- 当 `options.nodeList = true` 且存在规则增强或覆写内容时，接口仍正常返回 YAML，但 `warnings` 会提示对应配置已被忽略
 
 ## 短链
 

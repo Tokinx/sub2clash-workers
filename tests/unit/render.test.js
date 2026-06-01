@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import YAML from "yaml";
 
 import { createLink, updateLink } from "../../src/data/link-repository.js";
+import { createTemplate } from "../../src/data/settings-repository.js";
 import { renderConfig, renderLink } from "../../src/domain/render.js";
 import * as subscriptionCache from "../../src/data/subscription-cache.js";
 import { encodeBase64UrlText } from "../../src/utils/base64url.js";
@@ -106,6 +107,68 @@ describe("renderConfig", () => {
     expect(result.yaml).not.toContain("机场A 香港专线");
     expect(result.yaml).toContain("DOMAIN-SUFFIX,claude.ai,节点选择");
     expect(result.stats.proxyCount).toBe(2);
+  });
+
+  it("规则增强通过内部覆写生成 provider 和规则，并保持 MATCH 兜底在最后", async () => {
+    const env = createEnv();
+    const result = await renderConfig(env, new Request("https://app.example.com/"), createConfig({
+      sources: {
+        subscriptions: [],
+        nodes: ["ss://YWVzLTI1Ni1nY206cGFzc0BleGFtcGxlLmNvbTo4NDQz#RoutingNode"]
+      },
+      routing: {
+        ruleProviders: [
+          {
+            name: "前置集",
+            behavior: "domain",
+            url: "https://rules.example.com/pre.yaml",
+            group: "节点选择",
+            prepend: true
+          },
+          {
+            name: "后置集",
+            behavior: "classical",
+            url: "https://rules.example.com/post.yaml",
+            group: "国外媒体",
+            prepend: false
+          }
+        ],
+        rules: [
+          { value: "DOMAIN-SUFFIX,prepend.example,DIRECT", prepend: true },
+          { value: "DOMAIN-SUFFIX,append.example,节点选择", prepend: false }
+        ]
+      }
+    }));
+
+    const parsed = YAML.parse(result.yaml);
+
+    expect(parsed["rule-providers"]).toEqual({
+      "前置集": {
+        type: "http",
+        behavior: "domain",
+        url: "https://rules.example.com/pre.yaml",
+        path: "./providers/前置集.yaml",
+        interval: 3600
+      },
+      "后置集": {
+        type: "http",
+        behavior: "classical",
+        url: "https://rules.example.com/post.yaml",
+        path: "./providers/后置集.yaml",
+        interval: 3600
+      }
+    });
+    expect(parsed.rules).toEqual([
+      "RULE-SET,前置集,节点选择",
+      "DOMAIN-SUFFIX,prepend.example,DIRECT",
+      "GEOSITE,openai,OpenAI",
+      "GEOSITE,telegram,Telegram",
+      "GEOSITE,geolocation-!cn,国外媒体",
+      "GEOIP,private,DIRECT",
+      "DOMAIN-SUFFIX,append.example,节点选择",
+      "RULE-SET,后置集,国外媒体",
+      "MATCH,漏网之鱼"
+    ]);
   });
 
   it("开启自动旗帜时会补齐未带旗帜的节点名且不重复添加", async () => {
@@ -263,6 +326,97 @@ describe("renderConfig", () => {
     expect(result.yaml).not.toContain("GEOSITE,openai,OpenAI");
   });
 
+  it("用户覆写会覆盖规则增强生成的同名 rule provider", async () => {
+    const env = createEnv();
+    const result = await renderConfig(env, new Request("https://app.example.com/sub/demo"), createConfig({
+      sources: {
+        subscriptions: [],
+        nodes: ["ss://YWVzLTI1Ni1nY206cGFzc0BleGFtcGxlLmNvbTo4NDQz#OverrideProvider"]
+      },
+      routing: {
+        ruleProviders: [
+          {
+            name: "自定义集",
+            behavior: "domain",
+            url: "https://rules.example.com/generated.yaml",
+            group: "节点选择",
+            prepend: false
+          }
+        ],
+        rules: []
+      },
+      override: {
+        type: "yaml",
+        content: `"rule-providers":
+  自定义集!:
+    type: file
+    behavior: classical
+    path: ./manual.yaml
+`
+      }
+    }));
+
+    const parsed = YAML.parse(result.yaml);
+    expect(parsed["rule-providers"]["自定义集"]).toEqual({
+      type: "file",
+      behavior: "classical",
+      path: "./manual.yaml"
+    });
+  });
+
+  it("内部 routing 覆写替换同名 rule provider 时不会残留模板旧字段", async () => {
+    const env = createEnv();
+    const template = await createTemplate(env, {
+      name: "带旧 Provider 的模板",
+      target: "meta",
+      content: `mixed-port: 7890
+proxies: []
+proxy-groups: []
+rule-providers:
+  同名集:
+    type: file
+    behavior: classical
+    path: ./legacy.yaml
+    extra: should-drop
+rules:
+  - MATCH,节点选择
+`
+    });
+
+    const result = await renderConfig(env, new Request("https://app.example.com/sub/demo"), createConfig({
+      sources: {
+        subscriptions: [],
+        nodes: ["ss://YWVzLTI1Ni1nY206cGFzc0BleGFtcGxlLmNvbTo4NDQz#ReplaceProvider"]
+      },
+      template: {
+        mode: "custom",
+        value: template.id
+      },
+      routing: {
+        ruleProviders: [
+          {
+            name: "同名集",
+            behavior: "domain",
+            url: "https://rules.example.com/current.yaml",
+            group: "节点选择",
+            prepend: false
+          }
+        ],
+        rules: []
+      }
+    }));
+
+    const parsed = YAML.parse(result.yaml);
+    expect(parsed["rule-providers"]["同名集"]).toEqual({
+      type: "http",
+      behavior: "domain",
+      url: "https://rules.example.com/current.yaml",
+      path: "./providers/同名集.yaml",
+      interval: 3600
+    });
+    expect(parsed["rule-providers"]["同名集"]).not.toHaveProperty("extra");
+  });
+
   it("扩展覆写语法可以表达前置节点和 dialer-proxy 场景", async () => {
     const env = createEnv();
 
@@ -405,7 +559,7 @@ describe("renderConfig", () => {
     expect(result.yaml).not.toContain("- <all>");
   });
 
-  it("nodeList 模式会忽略覆写并返回 warning", async () => {
+  it("nodeList 模式会忽略规则增强与覆写并返回 warning", async () => {
     const env = createEnv();
 
     const result = await renderConfig(env, new Request("https://app.example.com/sub/demo"), {
@@ -419,8 +573,16 @@ describe("renderConfig", () => {
         value: "meta-default"
       },
       routing: {
-        ruleProviders: [],
-        rules: []
+        ruleProviders: [
+          {
+            name: "忽略集",
+            behavior: "domain",
+            url: "https://rules.example.com/ignored.yaml",
+            group: "节点选择",
+            prepend: false
+          }
+        ],
+        rules: [{ value: "DOMAIN-SUFFIX,ignored.example,节点选择", prepend: false }]
       },
       transforms: {
         filterRegex: "",
@@ -442,8 +604,10 @@ describe("renderConfig", () => {
       }
     });
 
-    expect(result.warnings).toEqual(["仅输出节点列表时已忽略覆写"]);
+    expect(result.warnings).toEqual(["仅输出节点列表时已忽略规则增强与配置覆写"]);
     expect(result.yaml).toContain("NodeOnly");
+    expect(result.yaml).not.toContain("DOMAIN-SUFFIX,ignored.example,节点选择");
+    expect(result.yaml).not.toContain("rule-providers");
     expect(result.yaml).not.toContain("覆写节点");
   });
 

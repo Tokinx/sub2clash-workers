@@ -11,13 +11,14 @@
 
 渲染阶段的顺序如下：
 
-1. 先完成模板合并、规则增强、节点解析、国家组生成
-2. 执行基础 YAML override
-3. 按顺序执行 `$patches`
-4. 对最终 `proxy-groups` 再做一次 `<all>` / `<countries>` / `<us>` 这类占位符展开
-5. `deepClean` 清理空对象、空数组、`null`，再输出 YAML
+1. 先完成节点解析、过滤替换、国家组生成和模板合并
+2. 将结构化规则增强转换为内部覆写对象并执行
+3. 执行用户 YAML override 的基础语法
+4. 按顺序执行用户 YAML override 中的 `$patches`
+5. 对最终 `proxy-groups` 再做一次 `<all>` / `<countries>` / `<us>` 这类占位符展开
+6. `deepClean` 清理空对象、空数组、`null`，再输出 YAML
 
-这意味着 override 永远拥有最终优先级。
+这意味着用户 YAML override 永远拥有最终优先级，可以覆盖规则增强生成的 `rules` 或同名 `rule-providers`。
 
 ## 基础语法
 

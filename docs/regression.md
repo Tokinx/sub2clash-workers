@@ -462,3 +462,24 @@
   - 新增覆盖默认关闭、开启后补旗帜、已有旗帜不重复添加和前端预览 payload 携带开关
 - 现存风险：
   - 国家/地区识别仍沿用当前轻量关键词表，未命中的节点不会自动补旗帜
+
+## 规则增强与配置覆写后端融合回归 2026-06-01 16:22 CST
+
+- 状态：已完成
+- 目标：在不改变 UI、长链接 payload 和短链配置结构的前提下，让规则增强走后端内部覆写链路，并保持用户 YAML 覆写最终优先级
+- 变更：
+  - `src/domain/yaml-override.js` 新增 `applyParsedOverride`，让已解析对象和用户 YAML 共用同一套合并、整段替换、数组操作与 `$patches` 逻辑
+  - `src/domain/render.js` 将规则增强从模板合并逻辑拆出，改为基于当前模板结果生成内部覆写对象后执行
+  - 内部规则增强会继续把后置 Rules 和后置 Rule Provider 插入到 `MATCH` 之前，并对同名 Rule Provider 做整段替换
+  - 用户 `override.content` 仍在内部规则增强之后执行，可覆盖 `rules` 或同名 `rule-providers`
+  - `nodeList` 模式继续不执行规则增强与覆写，并在存在相关配置时返回 warning
+- 测试：
+  - `bun run test:worker -- tests/unit/yaml-override.test.js tests/unit/render.test.js`
+  - `bun run test`
+- 结果：
+  - Worker 侧 2 个目标测试文件、23 个测试用例通过
+  - 完整回归中 Worker 侧 6 个测试文件、46 个测试用例通过
+  - 完整回归中前端 7 个测试文件、16 个测试用例通过
+  - 新增覆盖规则增强输出顺序、同名 Rule Provider 替换、用户覆写最终优先级和 nodeList 忽略提示
+- 现存风险：
+  - 本轮只做后端融合，前端仍保留规则增强表格与覆写编辑区两个入口

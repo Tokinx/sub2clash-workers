@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { applyYamlOverride } from "../../src/domain/yaml-override.js";
+import { applyParsedOverride, applyYamlOverride } from "../../src/domain/yaml-override.js";
 
 describe("applyYamlOverride", () => {
   it("支持深度合并", () => {
@@ -56,6 +56,46 @@ describe("applyYamlOverride", () => {
       "MATCH,节点选择",
       "GEOIP,private,DIRECT"
     ]);
+  });
+
+  it("支持直接应用已解析的覆写对象", () => {
+    const result = applyParsedOverride(
+      {
+        rules: ["MATCH,节点选择"],
+        "rule-providers": {
+          demo: {
+            type: "file",
+            path: "./legacy.yaml",
+            extra: true
+          }
+        }
+      },
+      {
+        "rules!": ["DOMAIN-SUFFIX,example.com,DIRECT", "MATCH,节点选择"],
+        "rule-providers": {
+          "demo!": {
+            type: "http",
+            behavior: "domain",
+            url: "https://rules.example.com/demo.yaml",
+            path: "./providers/demo.yaml",
+            interval: 3600
+          }
+        }
+      }
+    );
+
+    expect(result).toEqual({
+      rules: ["DOMAIN-SUFFIX,example.com,DIRECT", "MATCH,节点选择"],
+      "rule-providers": {
+        demo: {
+          type: "http",
+          behavior: "domain",
+          url: "https://rules.example.com/demo.yaml",
+          path: "./providers/demo.yaml",
+          interval: 3600
+        }
+      }
+    });
   });
 
   it("支持转义真实键名", () => {
