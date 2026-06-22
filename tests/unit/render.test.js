@@ -202,6 +202,7 @@ describe("renderConfig", () => {
         subscriptions: [],
         nodes: [
           "vless://12345678-1234-1234-1234-1234567890ab@example.com:443?type=ws&security=tls&host=example.com&path=%2Fws#MetaOnly",
+          "wireguard://cHJpdmF0ZS1rZXktcGxhY2Vob2xkZXI=@wg.example.com:51820?public-key=cHVibGljLWtleS1wbGFjZWhvbGRlcg%3D%3D&ip=172.16.0.2%2F32#WireGuardOnly",
           "ss://YWVzLTI1Ni1nY206cGFzc0BleGFtcGxlLmNvbTo4NDQz#ClashOK"
         ]
       },
@@ -231,6 +232,36 @@ describe("renderConfig", () => {
 
     expect(result.yaml).toContain("ClashOK");
     expect(result.yaml).not.toContain("MetaOnly");
+    expect(result.yaml).not.toContain("WireGuardOnly");
+    expect(result.stats.proxyCount).toBe(1);
+  });
+
+  it("在 meta 目标下会保留 wireguard 节点并输出对应字段", async () => {
+    const env = createEnv();
+    const result = await renderConfig(env, new Request("https://app.example.com/"), createConfig({
+      sources: {
+        subscriptions: [],
+        nodes: [
+          "wireguard://cHJpdmF0ZS1rZXktcGxhY2Vob2xkZXI=@wg.example.com:51820?public-key=cHVibGljLWtleS1wbGFjZWhvbGRlcg%3D%3D&ip=172.16.0.2%2F32&dns=1.1.1.1&udp=1#WireGuardMeta"
+        ]
+      }
+    }));
+
+    const parsed = YAML.parse(result.yaml);
+
+    expect(parsed.proxies).toEqual([
+      expect.objectContaining({
+        type: "wireguard",
+        name: "WireGuardMeta",
+        server: "wg.example.com",
+        port: 51820,
+        ip: "172.16.0.2/32",
+        "private-key": "cHJpdmF0ZS1rZXktcGxhY2Vob2xkZXI=",
+        "public-key": "cHVibGljLWtleS1wbGFjZWhvbGRlcg==",
+        dns: ["1.1.1.1"],
+        udp: true
+      })
+    ]);
     expect(result.stats.proxyCount).toBe(1);
   });
 

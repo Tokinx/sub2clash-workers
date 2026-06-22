@@ -105,3 +105,10 @@
 - 让用户 YAML override 继续作为最终优先级，覆盖内部规则增强结果
 - 补充 Worker 回归，覆盖规则顺序、同名 Rule Provider 替换和 nodeList 忽略 warning
 - 状态：已完成
+
+## Phase 17
+
+- 为连接字符串转换增加 `wireguard` 协议支持
+- 仅在 `Clash.Meta / Mihomo` 目标下保留 `wireguard` 节点，`Clash` 目标继续过滤
+- 补充协议解析与渲染回归，明确 `wireguard://` / `wg://` 的兼容字段约定
+- 状态：已完成

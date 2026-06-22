@@ -21,7 +21,7 @@
 输入侧当前支持以下分享协议：
 
 - Clash：`ss`、`ssr`、`vmess`、`trojan`、`socks5`
-- Clash.Meta：`ss`、`ssr`、`vmess`、`vless`、`trojan`、`hysteria`、`hysteria2`、`socks5`、`anytls`
+- Clash.Meta：`ss`、`ssr`、`vmess`、`vless`、`trojan`、`hysteria`、`hysteria2`、`socks5`、`anytls`、`wireguard`
 
 远程订阅内容支持两类格式：
 

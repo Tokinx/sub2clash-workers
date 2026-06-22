@@ -483,3 +483,21 @@
   - 新增覆盖规则增强输出顺序、同名 Rule Provider 替换、用户覆写最终优先级和 nodeList 忽略提示
 - 现存风险：
   - 本轮只做后端融合，前端仍保留规则增强表格与覆写编辑区两个入口
+
+## WireGuard 连接字符串回归 2026-06-22 16:14 CST
+
+- 状态：已完成
+- 目标：为连接字符串转换增加 `wireguard` 协议支持，并明确其仅在 `Clash.Meta / Mihomo` 目标下保留
+- 变更：
+  - `src/domain/parsers/index.js` 新增 `wireguard` 解析器，兼容 `wireguard://` 与 `wg://` 前缀
+  - `wireguard` 分享链接当前采用“服务端地址 + query 参数”格式，支持映射 `private-key`、`public-key`、`pre-shared-key`、`ip`、`ipv6`、`dns`、`mtu`、`reserved`、`udp`、`dialer-proxy`
+  - 协议支持矩阵已更新为仅在 `meta` 目标保留 `wireguard`，`clash` 目标继续过滤
+  - `README.md`、`docs/architecture.md` 与 `/.tasks/roadmap.md` 已同步更新支持范围和实现边界
+- 测试：
+  - `bun run test:worker -- tests/unit/parsers.test.js tests/unit/render.test.js`
+- 结果：
+  - Worker 侧 2 个目标测试文件、31 个测试用例通过
+  - 新增覆盖 `wg://` 前缀、地址别名、`reserved` 数组、`dns`、`udp`、`dialer-proxy` 解析
+  - 新增覆盖 `meta` 目标保留 `wireguard` 与 `clash` 目标过滤 `wireguard`
+- 现存风险：
+  - `wireguard://` 分享格式在生态内缺少统一标准，本次实现采用与 Mihomo YAML 字段直接对应的 query 参数约定；若后续需要兼容其他生成器方言，应基于真实样例再扩展别名

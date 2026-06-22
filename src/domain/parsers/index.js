@@ -5,7 +5,18 @@ import { badRequest } from "../../utils/errors.js";
 
 const SUPPORT_MATRIX = {
   clash: new Set(["ss", "ssr", "vmess", "trojan", "socks5"]),
-  meta: new Set(["ss", "ssr", "vmess", "vless", "trojan", "hysteria", "hysteria2", "socks5", "anytls"])
+  meta: new Set([
+    "ss",
+    "ssr",
+    "vmess",
+    "vless",
+    "trojan",
+    "hysteria",
+    "hysteria2",
+    "socks5",
+    "anytls",
+    "wireguard"
+  ])
 };
 
 function parsePort(value) {
@@ -72,6 +83,72 @@ function splitOnce(value, separator) {
   }
 
   return [value.slice(0, index), value.slice(index + separator.length)];
+}
+
+function parseInteger(value, label, { min = 0, max = Number.MAX_SAFE_INTEGER } = {}) {
+  const number = Number(value);
+  if (!Number.isInteger(number) || number < min || number > max) {
+    throw badRequest(`${label} 无效`);
+  }
+  return number;
+}
+
+function getFirstQueryValue(query, keys) {
+  for (const key of keys) {
+    const value = query.get(key);
+    if (value !== null && value !== undefined && value !== "") {
+      return value;
+    }
+  }
+  return undefined;
+}
+
+function normalizeBase64QueryValue(value) {
+  if (!value) {
+    return value;
+  }
+  return decodeUrlComponentSafe(value).replace(/ /g, "+");
+}
+
+function parseQueryList(value) {
+  if (!value) {
+    return undefined;
+  }
+
+  return value
+    .split(",")
+    .map((item) => decodeUrlComponentSafe(item.trim()))
+    .filter(Boolean);
+}
+
+function resolveWireGuardLocalAddress(query) {
+  const directIpv4 = getFirstQueryValue(query, ["ip", "ipv4"]);
+  const directIpv6 = getFirstQueryValue(query, ["ipv6"]);
+  const combined = parseQueryList(
+    getFirstQueryValue(query, ["address", "addresses", "local-address", "local_address"])
+  );
+
+  const pickFromCombined = (matcher) => combined?.find((item) => matcher(item));
+  const ip = directIpv4 || pickFromCombined((item) => !item.includes(":"));
+  const ipv6 = directIpv6 || pickFromCombined((item) => item.includes(":"));
+
+  return {
+    ip: ip ? decodeUrlComponentSafe(ip) : undefined,
+    ipv6: ipv6 ? decodeUrlComponentSafe(ipv6) : undefined
+  };
+}
+
+function parseWireGuardReserved(value) {
+  if (!value) {
+    return undefined;
+  }
+
+  const items = value.split(",").map((item) => item.trim()).filter(Boolean);
+  if (items.length && items.every((item) => /^\d+$/.test(item))) {
+    return items.map((item) => parseInteger(item, "WireGuard reserved", { min: 0, max: 255 }));
+  }
+
+  return decodeUrlComponentSafe(value);
 }
 
 function parseShadowsocks(proxy, options) {
@@ -395,6 +472,77 @@ function parseAnytls(proxy, options) {
   };
 }
 
+function parseWireGuard(proxy, options) {
+  const link = new URL(proxy.replace(/^wg:\/\//, "wireguard://"));
+  const query = link.searchParams;
+  const { ip, ipv6 } = resolveWireGuardLocalAddress(query);
+  const privateKey =
+    decodeUrlComponentSafe(link.username) ||
+    normalizeBase64QueryValue(
+      getFirstQueryValue(query, ["private-key", "private_key", "privatekey", "secret-key", "secretkey"])
+    );
+  const publicKey = normalizeBase64QueryValue(
+    getFirstQueryValue(query, ["public-key", "public_key", "publickey", "peer-public-key", "peer_public_key"])
+  );
+
+  if (!privateKey) {
+    throw badRequest("WireGuard private-key 缺失");
+  }
+  if (!publicKey) {
+    throw badRequest("WireGuard public-key 缺失");
+  }
+  if (!ip) {
+    throw badRequest("WireGuard ip 缺失");
+  }
+
+  const allowedIps =
+    parseQueryList(
+      getFirstQueryValue(query, ["allowed-ips", "allowed_ips", "allowedips"])
+    ) || ["0.0.0.0/0"];
+  const dns = parseQueryList(getFirstQueryValue(query, ["dns"]));
+  const remoteDnsResolve = optionalBoolFromQuery(
+    getFirstQueryValue(query, ["remote-dns-resolve", "remote_dns_resolve", "remoteDnsResolve"])
+  );
+  const preSharedKey = normalizeBase64QueryValue(
+    getFirstQueryValue(query, ["pre-shared-key", "pre_shared_key", "presharedkey"])
+  );
+  const reserved = parseWireGuardReserved(
+    getFirstQueryValue(query, ["reserved", "reserve"])
+  );
+  const persistentKeepaliveValue = getFirstQueryValue(query, [
+    "persistent-keepalive",
+    "persistent_keepalive",
+    "persistentKeepalive"
+  ]);
+  const mtuValue = getFirstQueryValue(query, ["mtu"]);
+  const dialerProxy = decodeUrlComponentSafe(
+    getFirstQueryValue(query, ["dialer-proxy", "dialer_proxy", "dialerProxy"])
+  );
+
+  return {
+    type: "wireguard",
+    name: getNameFromUrl(link),
+    server: link.hostname,
+    port: parsePort(link.port),
+    ip,
+    ipv6,
+    "private-key": privateKey,
+    "public-key": publicKey,
+    "allowed-ips": allowedIps,
+    "pre-shared-key": preSharedKey || undefined,
+    reserved,
+    "persistent-keepalive":
+      persistentKeepaliveValue === undefined
+        ? undefined
+        : parseInteger(persistentKeepaliveValue, "WireGuard persistent-keepalive", { min: 0 }),
+    mtu: mtuValue === undefined ? undefined : parseInteger(mtuValue, "WireGuard mtu", { min: 1 }),
+    "dialer-proxy": dialerProxy || undefined,
+    "remote-dns-resolve": remoteDnsResolve,
+    dns: dns?.length ? dns : undefined,
+    ...buildUdpField(query.get("udp"), options)
+  };
+}
+
 const PARSERS = [
   ["ss://", parseShadowsocks],
   ["ssr://", parseShadowsocksR],
@@ -406,7 +554,9 @@ const PARSERS = [
   ["hy2://", parseHysteria2],
   ["socks://", parseSocks],
   ["socks5://", parseSocks],
-  ["anytls://", parseAnytls]
+  ["anytls://", parseAnytls],
+  ["wireguard://", parseWireGuard],
+  ["wg://", parseWireGuard]
 ];
 
 export function isProxyLink(line) {

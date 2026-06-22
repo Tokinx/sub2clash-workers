@@ -22,6 +22,11 @@
 
 ## 配置覆写
 
+- 输入侧连接字符串当前支持：
+  - `Clash`：`ss`、`ssr`、`vmess`、`trojan`、`socks5`
+  - `Clash.Meta / Mihomo`：`ss`、`ssr`、`vmess`、`vless`、`trojan`、`hysteria`、`hysteria2`、`socks5`、`anytls`、`wireguard`
+- `wireguard` 仅参与 `Clash.Meta / Mihomo` 渲染；当目标为 `clash` 时会按既有支持矩阵直接过滤
+- `wireguard` 分享链接兼容 `wireguard://` 与 `wg://` 前缀，核心字段采用 query 参数承载，并映射到 Mihomo 的 `private-key`、`public-key`、`pre-shared-key`、`ip`、`ipv6`、`dns`、`mtu`、`reserved`、`udp`、`dialer-proxy` 等字段
 - 订阅源字段统一使用 `sources.subscriptions[].remark` 保存备注，仅作为管理台辅助信息，不参与订阅渲染与节点改名
 - `options.autoFlag` 作为单份配置的一部分参与长链接、短链接与实时预览；渲染层在节点过滤、替换、名称去重之后补齐旗帜，再生成国家组
 - 自动旗帜仅基于内置国家/地区识别规则处理节点名；若节点名已包含 emoji 旗帜或无法识别对应国家/地区，则保持原名

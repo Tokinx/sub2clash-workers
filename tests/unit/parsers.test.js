@@ -7,6 +7,9 @@ const PLACEHOLDER_SS2022_UPSK = "cGxhY2Vob2xkZXItdXBzaw==";
 const PLACEHOLDER_SS2022_IPSK = "cGxhY2Vob2xkZXItaXBzaw==";
 const PLACEHOLDER_HY2_PASSWORD = "cGxhY2Vob2xkZXItaHkyLXBhc3M=";
 const PLACEHOLDER_HY2_OBFS_PASSWORD = "cGxhY2Vob2xkZXItaHkyLW9iZnM=";
+const PLACEHOLDER_WG_PRIVATE_KEY = "cHJpdmF0ZS1rZXktcGxhY2Vob2xkZXI=";
+const PLACEHOLDER_WG_PUBLIC_KEY = "cHVibGljLWtleS1wbGFjZWhvbGRlcg==";
+const PLACEHOLDER_WG_PRESHARED_KEY = "cHJlc2hhcmVkLWtleS1wbGFjZWhvbGRlcg==";
 
 function encodeBase64(text) {
   return Buffer.from(text).toString("base64");
@@ -58,6 +61,11 @@ describe("协议解析器", () => {
       "anytls",
       "anytls://password@example.com:443?sni=example.com#AnyTLS",
       "anytls"
+    ],
+    [
+      "wireguard",
+      `wireguard://${PLACEHOLDER_WG_PRIVATE_KEY}@example.com:51820?public-key=${encodeURIComponent(PLACEHOLDER_WG_PUBLIC_KEY)}&ip=172.16.0.2%2F32#WireGuard`,
+      "wireguard"
     ]
   ];
 
@@ -130,5 +138,32 @@ describe("协议解析器", () => {
 
     expect(proxy.password).toBe(PLACEHOLDER_HY2_PASSWORD);
     expect(proxy["obfs-password"]).toBe(PLACEHOLDER_HY2_OBFS_PASSWORD);
+  });
+
+  it("wireguard 会解析 Mihomo 所需字段并兼容 wg:// 前缀", () => {
+    const proxy = parseProxyLink(
+      `wg://${PLACEHOLDER_WG_PRIVATE_KEY}@example.com:51820?public-key=${encodeURIComponent(PLACEHOLDER_WG_PUBLIC_KEY)}&pre-shared-key=${encodeURIComponent(PLACEHOLDER_WG_PRESHARED_KEY)}&address=172.16.0.2%2F32,2606%3A4700%3A110%3A8765%3Aabcd%3Aef01%3A2345%3A6789%2F128&dns=1.1.1.1,8.8.8.8&mtu=1280&reserved=1,2,3&dialer-proxy=%E5%89%8D%E7%BD%AE%E8%8A%82%E7%82%B9&udp=false#WG-Alias`,
+      { useUDP: true }
+    );
+
+    expect(proxy).toEqual({
+      type: "wireguard",
+      name: "WG-Alias",
+      server: "example.com",
+      port: 51820,
+      ip: "172.16.0.2/32",
+      ipv6: "2606:4700:110:8765:abcd:ef01:2345:6789/128",
+      "private-key": PLACEHOLDER_WG_PRIVATE_KEY,
+      "public-key": PLACEHOLDER_WG_PUBLIC_KEY,
+      "allowed-ips": ["0.0.0.0/0"],
+      "pre-shared-key": PLACEHOLDER_WG_PRESHARED_KEY,
+      reserved: [1, 2, 3],
+      "persistent-keepalive": undefined,
+      mtu: 1280,
+      "dialer-proxy": "前置节点",
+      "remote-dns-resolve": undefined,
+      dns: ["1.1.1.1", "8.8.8.8"],
+      udp: false
+    });
   });
 });
