@@ -100,6 +100,45 @@ bun run dev
 | `SUB_CACHE_TTL_SECONDS` | -    | 远程订阅缓存 TTL         | 300 秒       |
 | `MAX_REMOTE_FILE_SIZE`  | -    | 单次远程订阅拉取大小上限 | 1048576 字节 |
 
+## 补充说明
+
+### WireGuard 分享链接
+
+`wireguard` 当前仅用于 `Clash.Meta / Mihomo` 目标，支持 `wireguard://` 和 `wg://` 两种前缀。
+
+当前采用“`server:port` + query 参数”的连接字符串格式：
+
+| 参数 | 必填 | 说明 | 别名 / 备注 |
+| --- | --- | --- | --- |
+| `server` | 是 | 节点服务器地址，放在 URL host 部分 | 例如 `wg.example.com` |
+| `port` | 是 | 节点端口，放在 URL port 部分 | 例如 `51820` |
+| `private-key` | 是 | WireGuard 私钥 | 支持 `private_key` / `privatekey` / `secret-key` / `secretkey`；也可直接放在 URL username 部分 |
+| `public-key` | 是 | Peer 公钥 | 支持 `public_key` / `publickey` / `peer-public-key` / `peer_public_key` |
+| `ip` | 是 | 本地 IPv4 地址/CIDR | 例如 `172.16.0.2/32` |
+| `ipv6` | 否 | 本地 IPv6 地址/CIDR | 可与 `ip` 同时使用 |
+| `address` | 否 | 一次传入 IPv4 和 IPv6 本地地址 | 支持 `addresses` / `local-address` / `local_address`；例如 `172.16.0.2/32,2606:.../128` |
+| `dns` | 否 | DNS 列表 | 多个值用英文逗号分隔 |
+| `pre-shared-key` | 否 | 预共享密钥 | 无 |
+| `mtu` | 否 | MTU | 整数 |
+| `reserved` | 否 | Reserved 值 | 可传 `1,2,3` 这类数组 |
+| `udp` | 否 | 是否显式输出 UDP 字段 | 支持 `1` / `true` / `false` |
+| `dialer-proxy` | 否 | 绑定前置节点名 | 支持 `dialer_proxy` / `dialerProxy` |
+| `allowed-ips` | 否 | Allowed IPs 列表 | 支持 `allowed_ips` / `allowedips`；默认 `0.0.0.0/0` |
+| `persistent-keepalive` | 否 | Persistent Keepalive | 支持 `persistent_keepalive` / `persistentKeepalive` |
+| `remote-dns-resolve` | 否 | 是否启用远端 DNS 解析 | 支持 `remote_dns_resolve` / `remoteDnsResolve` |
+
+示例：
+
+```text
+key 中如果包含 `=`、`+`、`/`，建议做 URL encode
+
+wireguard://cHJpdmF0ZS1rZXk=@wg.example.com:51820?public-key=cHVibGljLWtleQ%3D%3D&ip=172.16.0.2%2F32#WG-Min
+
+wireguard://cHJpdmF0ZS1rZXk=@wg.example.com:51820?public-key=cHVibGljLWtleQ%3D%3D&address=172.16.0.2%2F32,2606%3A4700%3A110%3A8765%3Aabcd%3Aef01%3A2345%3A6789%2F128&dns=1.1.1.1,8.8.8.8#WG-Address
+
+wg://cHJpdmF0ZS1rZXk=@wg.example.com:51820?public-key=cHVibGljLWtleQ%3D%3D&pre-shared-key=cHJlc2hhcmVkLWtleQ%3D%3D&ip=172.16.0.2%2F32&mtu=1280&reserved=1,2,3&udp=false&dialer-proxy=%E5%89%8D%E7%BD%AE%E8%8A%82%E7%82%B9#WG-Full
+```
+
 ## 相关文档
 
 - [DESIGN.md](./DESIGN.md)
