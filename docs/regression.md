@@ -501,3 +501,23 @@
   - 新增覆盖 `meta` 目标保留 `wireguard` 与 `clash` 目标过滤 `wireguard`
 - 现存风险：
   - `wireguard://` 分享格式在生态内缺少统一标准，本次实现采用与 Mihomo YAML 字段直接对应的 query 参数约定；若后续需要兼容其他生成器方言，应基于真实样例再扩展别名
+
+## SSH 连接字符串回归 2026-06-24 11:28 CST
+
+- 状态：已完成
+- 目标：为连接字符串转换增加 `ssh` 协议支持，并明确当前仅支持密码模式且仅在 `Clash.Meta / Mihomo` 目标下保留
+- 变更：
+  - `src/domain/parsers/index.js` 新增 `ssh` 解析器，采用 `ssh://username:password@server:port#name` 格式
+  - `ssh` 解析结果映射到 Mihomo 所需的 `server`、`port`、`username`、`password` 字段，并对 URL 编码后的用户名和密码做 decode
+  - 当 `ssh` 链接缺少用户名或密码时，解析器会显式报错 `SSH 节点暂只支持密码认证`
+  - 协议支持矩阵已更新为仅在 `meta` 目标保留 `ssh`，`clash` 目标继续过滤
+  - `README.md`、`docs/architecture.md` 与 `/.tasks/roadmap.md` 已同步更新支持范围和连接字符串约定
+- 测试：
+  - `bun run test:worker -- tests/unit/parsers.test.js tests/unit/render.test.js`
+  - `bun run test:worker`
+- 结果：
+  - Worker 侧 2 个目标测试文件、35 个测试用例通过
+  - 完整回归中 Worker 侧 6 个测试文件、53 个测试用例通过
+  - 新增覆盖 `ssh` 的基础识别、URL decode、无密码报错、`meta` 目标保留与 `clash` 目标过滤
+- 现存风险：
+  - 当前未支持 SSH 私钥认证、`host-key` 等扩展字段；若后续需要兼容更多 Mihomo `ssh` 字段，应基于真实分享样例继续扩展 query 参数约定

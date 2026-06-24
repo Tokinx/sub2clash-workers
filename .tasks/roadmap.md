@@ -112,3 +112,10 @@
 - 仅在 `Clash.Meta / Mihomo` 目标下保留 `wireguard` 节点，`Clash` 目标继续过滤
 - 补充协议解析与渲染回归，明确 `wireguard://` / `wg://` 的兼容字段约定
 - 状态：已完成
+
+## Phase 18
+
+- 为连接字符串转换增加 `ssh` 协议支持
+- 当前仅支持 `ssh://username:password@server:port#name` 密码模式
+- 仅在 `Clash.Meta / Mihomo` 目标下保留 `ssh` 节点，`Clash` 目标继续过滤
+- 状态：已完成

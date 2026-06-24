@@ -21,7 +21,7 @@
 输入侧当前支持以下分享协议：
 
 - Clash：`ss`、`ssr`、`vmess`、`trojan`、`socks5`
-- Clash.Meta：`ss`、`ssr`、`vmess`、`vless`、`trojan`、`hysteria`、`hysteria2`、`socks5`、`anytls`、`wireguard`
+- Clash.Meta：`ss`、`ssr`、`vmess`、`vless`、`trojan`、`hysteria`、`hysteria2`、`socks5`、`anytls`、`wireguard`、`ssh`
 
 远程订阅内容支持两类格式：
 
@@ -138,6 +138,26 @@ wireguard://cHJpdmF0ZS1rZXk=@wg.example.com:51820?public-key=cHVibGljLWtleQ%3D%3
 
 wg://cHJpdmF0ZS1rZXk=@wg.example.com:51820?public-key=cHVibGljLWtleQ%3D%3D&pre-shared-key=cHJlc2hhcmVkLWtleQ%3D%3D&ip=172.16.0.2%2F32&mtu=1280&reserved=1,2,3&udp=false&dialer-proxy=%E5%89%8D%E7%BD%AE%E8%8A%82%E7%82%B9#WG-Full
 ```
+
+### SSH 分享链接
+
+`ssh` 当前仅用于 `Clash.Meta / Mihomo` 目标，暂只支持密码认证，不支持私钥认证。
+
+当前采用标准 URL 形式：
+
+```text
+ssh://username:password@ssh.example.com:22#SSH-Node
+```
+
+字段约定：
+
+| 参数 | 必填 | 说明 | 备注 |
+| --- | --- | --- | --- |
+| `username` | 是 | SSH 用户名 | 放在 URL username 部分 |
+| `password` | 是 | SSH 密码 | 放在 URL password 部分，若包含 `@`、`:`、`/` 等字符需先做 URL encode |
+| `server` | 是 | SSH 服务端地址 | 放在 URL host 部分 |
+| `port` | 是 | SSH 服务端端口 | 放在 URL port 部分 |
+| `name` | 否 | 节点名 | 放在 URL fragment 部分，缺省时回退为 `server:port` |
 
 ## 相关文档
 

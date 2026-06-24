@@ -15,7 +15,8 @@ const SUPPORT_MATRIX = {
     "hysteria2",
     "socks5",
     "anytls",
-    "wireguard"
+    "wireguard",
+    "ssh"
   ])
 };
 
@@ -472,6 +473,25 @@ function parseAnytls(proxy, options) {
   };
 }
 
+function parseSsh(proxy) {
+  const link = new URL(proxy);
+  const username = decodeUrlComponentSafe(link.username);
+  const password = decodeUrlComponentSafe(link.password);
+
+  if (!username || !password) {
+    throw badRequest("SSH 节点暂只支持密码认证");
+  }
+
+  return {
+    type: "ssh",
+    name: getNameFromUrl(link),
+    server: link.hostname,
+    port: parsePort(link.port),
+    username,
+    password
+  };
+}
+
 function parseWireGuard(proxy, options) {
   const link = new URL(proxy.replace(/^wg:\/\//, "wireguard://"));
   const query = link.searchParams;
@@ -555,6 +575,7 @@ const PARSERS = [
   ["socks://", parseSocks],
   ["socks5://", parseSocks],
   ["anytls://", parseAnytls],
+  ["ssh://", parseSsh],
   ["wireguard://", parseWireGuard],
   ["wg://", parseWireGuard]
 ];

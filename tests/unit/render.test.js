@@ -202,6 +202,7 @@ describe("renderConfig", () => {
         subscriptions: [],
         nodes: [
           "vless://12345678-1234-1234-1234-1234567890ab@example.com:443?type=ws&security=tls&host=example.com&path=%2Fws#MetaOnly",
+          "ssh://demo-user:demo-pass@ssh.example.com:22#SSHOnly",
           "wireguard://cHJpdmF0ZS1rZXktcGxhY2Vob2xkZXI=@wg.example.com:51820?public-key=cHVibGljLWtleS1wbGFjZWhvbGRlcg%3D%3D&ip=172.16.0.2%2F32#WireGuardOnly",
           "ss://YWVzLTI1Ni1nY206cGFzc0BleGFtcGxlLmNvbTo4NDQz#ClashOK"
         ]
@@ -232,7 +233,32 @@ describe("renderConfig", () => {
 
     expect(result.yaml).toContain("ClashOK");
     expect(result.yaml).not.toContain("MetaOnly");
+    expect(result.yaml).not.toContain("SSHOnly");
     expect(result.yaml).not.toContain("WireGuardOnly");
+    expect(result.stats.proxyCount).toBe(1);
+  });
+
+  it("在 meta 目标下会保留 ssh 节点并输出密码模式字段", async () => {
+    const env = createEnv();
+    const result = await renderConfig(env, new Request("https://app.example.com/"), createConfig({
+      sources: {
+        subscriptions: [],
+        nodes: ["ssh://demo%2Buser:p%40ss%3Aword@ssh.example.com:22#SSHMeta"]
+      }
+    }));
+
+    const parsed = YAML.parse(result.yaml);
+
+    expect(parsed.proxies).toEqual([
+      expect.objectContaining({
+        type: "ssh",
+        name: "SSHMeta",
+        server: "ssh.example.com",
+        port: 22,
+        username: "demo+user",
+        password: "p@ss:word"
+      })
+    ]);
     expect(result.stats.proxyCount).toBe(1);
   });
 

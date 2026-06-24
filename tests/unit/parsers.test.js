@@ -63,6 +63,11 @@ describe("协议解析器", () => {
       "anytls"
     ],
     [
+      "ssh",
+      "ssh://demo-user:demo-pass@example.com:22#SSH",
+      "ssh"
+    ],
+    [
       "wireguard",
       `wireguard://${PLACEHOLDER_WG_PRIVATE_KEY}@example.com:51820?public-key=${encodeURIComponent(PLACEHOLDER_WG_PUBLIC_KEY)}&ip=172.16.0.2%2F32#WireGuard`,
       "wireguard"
@@ -138,6 +143,28 @@ describe("协议解析器", () => {
 
     expect(proxy.password).toBe(PLACEHOLDER_HY2_PASSWORD);
     expect(proxy["obfs-password"]).toBe(PLACEHOLDER_HY2_OBFS_PASSWORD);
+  });
+
+  it("ssh 会解析密码模式所需字段并做 URL decode", () => {
+    const proxy = parseProxyLink(
+      "ssh://demo%2Buser:p%40ss%3Aword@example.com:22#SSH-Encoded",
+      { useUDP: false }
+    );
+
+    expect(proxy).toEqual({
+      type: "ssh",
+      name: "SSH-Encoded",
+      server: "example.com",
+      port: 22,
+      username: "demo+user",
+      password: "p@ss:word"
+    });
+  });
+
+  it("ssh 暂不支持无密码模式", () => {
+    expect(() =>
+      parseProxyLink("ssh://demo-user@example.com:22#SSH-KeyOnly", { useUDP: false })
+    ).toThrowError("SSH 节点暂只支持密码认证");
   });
 
   it("wireguard 会解析 Mihomo 所需字段并兼容 wg:// 前缀", () => {
