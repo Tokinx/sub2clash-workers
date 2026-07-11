@@ -119,3 +119,11 @@
 - 当前仅支持 `ssh://username:password@server:port#name` 密码模式
 - 仅在 `Clash.Meta / Mihomo` 目标下保留 `ssh` 节点，`Clash` 目标继续过滤
 - 状态：已完成
+
+## Phase 19
+
+- 面向 Cloudflare Workers 免费版 CPU 限制优化订阅渲染热路径
+- 同域订阅改为结构化传递节点，避免子链 YAML 序列化后被父链再次解析
+- 增加订阅源与节点数量上限，默认最多 10 个订阅源、100 个输入节点
+- 删除空规则增强、空覆写产生的无效深拷贝，并为节点文本/Base64 订阅增加快速分流
+- 状态：已完成

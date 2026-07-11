@@ -272,9 +272,7 @@ function executeSelect(selectSpec, rootConfig, path) {
     throw unprocessable("$select.from 必须指向数组字段", formatPath(path, "from"));
   }
 
-  const selected = source.filter((item) =>
-    matchesItem(item, selectSpec.where, formatPath(path, "where"))
-  );
+  const selected = source.filter((item) => matchesItem(item, selectSpec.where, formatPath(path, "where")));
 
   const extracted = selected.map((item) => {
     if (!selectSpec.field) {
@@ -290,9 +288,7 @@ function executeSelect(selectSpec, rootConfig, path) {
 
 function resolveTemplateValue(template, rootConfig, path = "") {
   if (Array.isArray(template)) {
-    return template.map((item, index) =>
-      resolveTemplateValue(item, rootConfig, `${path}[${index}]`)
-    );
+    return template.map((item, index) => resolveTemplateValue(item, rootConfig, `${path}[${index}]`));
   }
 
   if (isPlainObject(template)) {
@@ -349,9 +345,7 @@ function applyPatch(rootConfig, patch, path) {
   const targetRef = resolveArrayTarget(rootConfig, patch.target, formatPath(path, "target"));
   const array = targetRef.parent[targetRef.key];
   const matchedIndexes = array
-    .map((item, index) =>
-      matchesItem(item, patch.match, formatPath(path, "match")) ? index : -1
-    )
+    .map((item, index) => (matchesItem(item, patch.match, formatPath(path, "match")) ? index : -1))
     .filter((index) => index !== -1);
 
   switch (patch.op) {
@@ -416,7 +410,7 @@ function applyPatch(rootConfig, patch, path) {
 
 function applyPatches(baseConfig, patches) {
   if (patches === undefined) {
-    return clone(baseConfig);
+    return baseConfig;
   }
 
   if (!Array.isArray(patches)) {
@@ -439,13 +433,17 @@ export function applyParsedOverride(baseConfig, overrideObject, topLevelErrorMes
   const patches = plainOverride.$patches;
   delete plainOverride.$patches;
 
+  if (Object.keys(plainOverride).length === 0 && patches === undefined) {
+    return baseConfig;
+  }
+
   const merged = mergeObject(baseConfig, plainOverride);
   return applyPatches(merged, patches);
 }
 
 export function applyYamlOverride(baseConfig, overrideContent) {
   if (!overrideContent.trim()) {
-    return clone(baseConfig);
+    return baseConfig;
   }
 
   let overrideObject;

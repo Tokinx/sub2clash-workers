@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parseProxyLink } from "../../src/domain/parsers/index.js";
+import { parseProxyLink, parseSubscriptionBody } from "../../src/domain/parsers/index.js";
 
 const PLACEHOLDER_SS2022_PSK = "cGxhY2Vob2xkZXItc2luZ2xlLWtleQ==";
 const PLACEHOLDER_SS2022_UPSK = "cGxhY2Vob2xkZXItdXBzaw==";
@@ -17,61 +17,21 @@ function encodeBase64(text) {
 
 describe("协议解析器", () => {
   const cases = [
-    [
-      "ss",
-      "ss://YWVzLTI1Ni1nY206cGFzc0BleGFtcGxlLmNvbTo4NDQz#SS",
-      "ss"
-    ],
-    [
-      "ssr",
-      "ssr://ZXhhbXBsZS5jb206ODM4ODphdXRoX2FlczEyOF9tZDU6YWVzLTI1Ni1nY206cGxhaW46Y0dGemN3Lz9yZW1hcmtzPVUxTlM",
-      "ssr"
-    ],
+    ["ss", "ss://YWVzLTI1Ni1nY206cGFzc0BleGFtcGxlLmNvbTo4NDQz#SS", "ss"],
+    ["ssr", "ssr://ZXhhbXBsZS5jb206ODM4ODphdXRoX2FlczEyOF9tZDU6YWVzLTI1Ni1nY206cGxhaW46Y0dGemN3Lz9yZW1hcmtzPVUxTlM", "ssr"],
     [
       "vmess",
       "vmess://eyJ2IjoiMiIsInBzIjoiVk1lc3MiLCJhZGQiOiJleGFtcGxlLmNvbSIsInBvcnQiOiI0NDMiLCJpZCI6IjEyMzQ1Njc4LTEyMzQtMTIzNC0xMjM0LTEyMzQ1Njc4OTBhYiIsImFpZCI6IjAiLCJzY3kiOiJhdXRvIiwibmV0Ijoid3MiLCJ0eXBlIjoiIiwiaG9zdCI6ImV4YW1wbGUuY29tIiwicGF0aCI6Ii93cyIsInRscyI6InRscyJ9",
       "vmess"
     ],
-    [
-      "vless",
-      "vless://12345678-1234-1234-1234-1234567890ab@example.com:443?type=ws&security=tls&host=example.com&path=%2Fws#VLESS",
-      "vless"
-    ],
-    [
-      "trojan",
-      "trojan://secret@example.com:443?type=ws&host=example.com&path=%2Ftrojan#Trojan",
-      "trojan"
-    ],
-    [
-      "hysteria",
-      "hysteria://example.com:443?upmbps=20&downmbps=100&obfs=salamander#Hysteria",
-      "hysteria"
-    ],
-    [
-      "hysteria2",
-      "hysteria2://password@example.com:443?sni=example.com#Hysteria2",
-      "hysteria2"
-    ],
-    [
-      "socks5",
-      "socks5://user:pass@example.com:1080#Socks",
-      "socks5"
-    ],
-    [
-      "anytls",
-      "anytls://password@example.com:443?sni=example.com#AnyTLS",
-      "anytls"
-    ],
-    [
-      "ssh",
-      "ssh://demo-user:demo-pass@example.com:22#SSH",
-      "ssh"
-    ],
-    [
-      "wireguard",
-      `wireguard://${PLACEHOLDER_WG_PRIVATE_KEY}@example.com:51820?public-key=${encodeURIComponent(PLACEHOLDER_WG_PUBLIC_KEY)}&ip=172.16.0.2%2F32#WireGuard`,
-      "wireguard"
-    ]
+    ["vless", "vless://12345678-1234-1234-1234-1234567890ab@example.com:443?type=ws&security=tls&host=example.com&path=%2Fws#VLESS", "vless"],
+    ["trojan", "trojan://secret@example.com:443?type=ws&host=example.com&path=%2Ftrojan#Trojan", "trojan"],
+    ["hysteria", "hysteria://example.com:443?upmbps=20&downmbps=100&obfs=salamander#Hysteria", "hysteria"],
+    ["hysteria2", "hysteria2://password@example.com:443?sni=example.com#Hysteria2", "hysteria2"],
+    ["socks5", "socks5://user:pass@example.com:1080#Socks", "socks5"],
+    ["anytls", "anytls://password@example.com:443?sni=example.com#AnyTLS", "anytls"],
+    ["ssh", "ssh://demo-user:demo-pass@example.com:22#SSH", "ssh"],
+    ["wireguard", `wireguard://${PLACEHOLDER_WG_PRIVATE_KEY}@example.com:51820?public-key=${encodeURIComponent(PLACEHOLDER_WG_PUBLIC_KEY)}&ip=172.16.0.2%2F32#WireGuard`, "wireguard"]
   ];
 
   it.each(cases)("可以解析 %s 分享链接", (_, source, expectedType) => {
@@ -81,55 +41,35 @@ describe("协议解析器", () => {
   });
 
   it("页面未开启 UDP 时，不主动写入 udp: false", () => {
-    const proxy = parseProxyLink(
-      "ss://YWVzLTI1Ni1nY206cGFzc0BleGFtcGxlLmNvbTo4NDQz#SS",
-      { useUDP: false }
-    );
+    const proxy = parseProxyLink("ss://YWVzLTI1Ni1nY206cGFzc0BleGFtcGxlLmNvbTo4NDQz#SS", { useUDP: false });
 
     expect(proxy).not.toHaveProperty("udp");
   });
 
   it("页面开启 UDP 时，会显式写入 udp: true", () => {
-    const proxy = parseProxyLink(
-      "ss://YWVzLTI1Ni1nY206cGFzc0BleGFtcGxlLmNvbTo4NDQz#SS",
-      { useUDP: true }
-    );
+    const proxy = parseProxyLink("ss://YWVzLTI1Ni1nY206cGFzc0BleGFtcGxlLmNvbTo4NDQz#SS", { useUDP: true });
 
     expect(proxy.udp).toBe(true);
   });
 
   it("链接里显式携带 udp 参数时，保留其布尔值", () => {
-    const enabled = parseProxyLink(
-      "vless://12345678-1234-1234-1234-1234567890ab@example.com:443?type=ws&security=tls&host=example.com&path=%2Fws&udp=1#VLESS",
-      { useUDP: false }
-    );
-    const disabled = parseProxyLink(
-      "vless://12345678-1234-1234-1234-1234567890ab@example.com:443?type=ws&security=tls&host=example.com&path=%2Fws&udp=false#VLESS",
-      { useUDP: false }
-    );
+    const enabled = parseProxyLink("vless://12345678-1234-1234-1234-1234567890ab@example.com:443?type=ws&security=tls&host=example.com&path=%2Fws&udp=1#VLESS", { useUDP: false });
+    const disabled = parseProxyLink("vless://12345678-1234-1234-1234-1234567890ab@example.com:443?type=ws&security=tls&host=example.com&path=%2Fws&udp=false#VLESS", { useUDP: false });
 
     expect(enabled.udp).toBe(true);
     expect(disabled.udp).toBe(false);
   });
 
   it("ss-2022 密码保持 base64 原样，不做二次解码", () => {
-    const proxy = parseProxyLink(
-      `ss://2022-blake3-aes-256-gcm:${encodeURIComponent(PLACEHOLDER_SS2022_PSK)}@example.com:20507#SS2022`,
-      { useUDP: false }
-    );
+    const proxy = parseProxyLink(`ss://2022-blake3-aes-256-gcm:${encodeURIComponent(PLACEHOLDER_SS2022_PSK)}@example.com:20507#SS2022`, { useUDP: false });
 
     expect(proxy.cipher).toBe("2022-blake3-aes-256-gcm");
     expect(proxy.password).toBe(PLACEHOLDER_SS2022_PSK);
   });
 
   it("ss-2022 使用 base64(method:password) 形式时保留双段 key", () => {
-    const encodedUserInfo = encodeBase64(
-      `2022-blake3-aes-256-gcm:${PLACEHOLDER_SS2022_UPSK}:${PLACEHOLDER_SS2022_IPSK}`
-    );
-    const proxy = parseProxyLink(
-      `ss://${encodedUserInfo}@example.com:1043#SS2022-Double`,
-      { useUDP: false }
-    );
+    const encodedUserInfo = encodeBase64(`2022-blake3-aes-256-gcm:${PLACEHOLDER_SS2022_UPSK}:${PLACEHOLDER_SS2022_IPSK}`);
+    const proxy = parseProxyLink(`ss://${encodedUserInfo}@example.com:1043#SS2022-Double`, { useUDP: false });
 
     expect(proxy.cipher).toBe("2022-blake3-aes-256-gcm");
     expect(proxy.password).toBe(`${PLACEHOLDER_SS2022_UPSK}:${PLACEHOLDER_SS2022_IPSK}`);
@@ -146,10 +86,7 @@ describe("协议解析器", () => {
   });
 
   it("ssh 会解析密码模式所需字段并做 URL decode", () => {
-    const proxy = parseProxyLink(
-      "ssh://demo%2Buser:p%40ss%3Aword@example.com:22#SSH-Encoded",
-      { useUDP: false }
-    );
+    const proxy = parseProxyLink("ssh://demo%2Buser:p%40ss%3Aword@example.com:22#SSH-Encoded", { useUDP: false });
 
     expect(proxy).toEqual({
       type: "ssh",
@@ -163,7 +100,9 @@ describe("协议解析器", () => {
 
   it("ssh 暂不支持无密码模式", () => {
     expect(() =>
-      parseProxyLink("ssh://demo-user@example.com:22#SSH-KeyOnly", { useUDP: false })
+      parseProxyLink("ssh://demo-user@example.com:22#SSH-KeyOnly", {
+        useUDP: false
+      })
     ).toThrowError("SSH 节点暂只支持密码认证");
   });
 
@@ -192,5 +131,22 @@ describe("协议解析器", () => {
       dns: ["1.1.1.1", "8.8.8.8"],
       udp: false
     });
+  });
+});
+
+describe("订阅正文解析", () => {
+  const node = "ss://YWVzLTI1Ni1nY206cGFzc0BleGFtcGxlLmNvbTo4NDQz#Node";
+
+  it("解析节点文本", () => {
+    const proxies = parseSubscriptionBody(`${node}A\n${node}B`);
+
+    expect(proxies).toHaveLength(2);
+  });
+
+  it("超过节点上限时拒绝节点文本和 Clash YAML", () => {
+    const nodes = Array.from({ length: 3 }, (_, index) => `${node}${index}`);
+
+    expect(() => parseSubscriptionBody(nodes.join("\n"), {}, { maxProxies: 2 })).toThrowError("节点数量不能超过 2");
+    expect(() => parseSubscriptionBody(`proxies:\n${nodes.map((name) => `  - name: ${name}`).join("\n")}`, {}, { maxProxies: 2 })).toThrowError("节点数量不能超过 2");
   });
 });

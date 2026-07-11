@@ -144,7 +144,10 @@ function parseWireGuardReserved(value) {
     return undefined;
   }
 
-  const items = value.split(",").map((item) => item.trim()).filter(Boolean);
+  const items = value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
   if (items.length && items.every((item) => /^\d+$/.test(item))) {
     return items.map((item) => parseInteger(item, "WireGuard reserved", { min: 0, max: 255 }));
   }
@@ -207,9 +210,7 @@ function parseShadowsocksR(proxy, options) {
     throw badRequest("SSR 节点格式错误");
   }
   const params = new URLSearchParams(queryString);
-  const name = params.get("remarks")
-    ? decodeBase64Loose(params.get("remarks"))
-    : `${parts[0]}:${parts[1]}`;
+  const name = params.get("remarks") ? decodeBase64Loose(params.get("remarks")) : `${parts[0]}:${parts[1]}`;
 
   return {
     type: "ssr",
@@ -221,9 +222,7 @@ function parseShadowsocksR(proxy, options) {
     obfs: parts[4],
     password: decodeBase64Loose(parts[5]),
     "obfs-param": params.get("obfsparam") ? decodeBase64Loose(params.get("obfsparam")) : undefined,
-    "protocol-param": params.get("protoparam")
-      ? decodeBase64Loose(params.get("protoparam"))
-      : undefined,
+    "protocol-param": params.get("protoparam") ? decodeBase64Loose(params.get("protoparam")) : undefined,
     ...buildUdpField(undefined, options)
   };
 }
@@ -515,10 +514,9 @@ function parseWireGuard(proxy, options) {
     throw badRequest("WireGuard ip 缺失");
   }
 
-  const allowedIps =
-    parseQueryList(
-      getFirstQueryValue(query, ["allowed-ips", "allowed_ips", "allowedips"])
-    ) || ["0.0.0.0/0"];
+  const allowedIps = parseQueryList(getFirstQueryValue(query, ["allowed-ips", "allowed_ips", "allowedips"])) || [
+    "0.0.0.0/0"
+  ];
   const dns = parseQueryList(getFirstQueryValue(query, ["dns"]));
   const remoteDnsResolve = optionalBoolFromQuery(
     getFirstQueryValue(query, ["remote-dns-resolve", "remote_dns_resolve", "remoteDnsResolve"])
@@ -526,9 +524,7 @@ function parseWireGuard(proxy, options) {
   const preSharedKey = normalizeBase64QueryValue(
     getFirstQueryValue(query, ["pre-shared-key", "pre_shared_key", "presharedkey"])
   );
-  const reserved = parseWireGuardReserved(
-    getFirstQueryValue(query, ["reserved", "reserve"])
-  );
+  const reserved = parseWireGuardReserved(getFirstQueryValue(query, ["reserved", "reserve"]));
   const persistentKeepaliveValue = getFirstQueryValue(query, [
     "persistent-keepalive",
     "persistent_keepalive",
@@ -580,6 +576,44 @@ const PARSERS = [
   ["wg://", parseWireGuard]
 ];
 
+function assertProxyCount(count, maxProxies) {
+  if (Number.isFinite(maxProxies) && count > maxProxies) {
+    throw badRequest(`节点数量不能超过 ${maxProxies}`);
+  }
+}
+
+function parseProxyLines(sourceText, options, maxProxies) {
+  const proxies = [];
+  let start = 0;
+
+  while (start <= sourceText.length) {
+    const newlineIndex = sourceText.indexOf("\n", start);
+    const end = newlineIndex === -1 ? sourceText.length : newlineIndex;
+    const line = sourceText.slice(start, end).replace(/\r$/, "").trim();
+
+    if (line && isProxyLink(line)) {
+      proxies.push(parseProxyLink(line, options));
+      assertProxyCount(proxies.length, maxProxies);
+    }
+
+    if (newlineIndex === -1) {
+      break;
+    }
+    start = newlineIndex + 1;
+  }
+
+  return proxies;
+}
+
+function decodeProxyText(sourceText) {
+  try {
+    const decoded = decodeBase64Loose(sourceText);
+    return isProxyLink(decoded.trim()) ? decoded : null;
+  } catch {
+    return null;
+  }
+}
+
 export function isProxyLink(line) {
   return PARSERS.some(([prefix]) => line.startsWith(prefix));
 }
@@ -594,30 +628,30 @@ export function parseProxyLink(line, options = {}) {
   throw badRequest(`不支持的协议: ${line.slice(0, 24)}`);
 }
 
-export function parseSubscriptionBody(body, options = {}) {
+export function parseSubscriptionBody(body, options = {}, limits = {}) {
+  const sourceText = body.trim();
+  const maxProxies = Number(limits.maxProxies);
+
+  if (isProxyLink(sourceText)) {
+    return parseProxyLines(sourceText, options, maxProxies);
+  }
+
+  const decodedProxyText = decodeProxyText(sourceText);
+  if (decodedProxyText) {
+    return parseProxyLines(decodedProxyText, options, maxProxies);
+  }
+
+  let parsed;
   try {
-    const parsed = YAML.parse(body);
-    if (parsed && typeof parsed === "object" && Array.isArray(parsed.proxies)) {
-      return parsed.proxies;
-    }
+    parsed = YAML.parse(body);
   } catch {}
 
-  const sourceText = isProxyLink(body.trim())
-    ? body
-    : (() => {
-        try {
-          return decodeBase64Loose(body.trim());
-        } catch {
-          return body;
-        }
-      })();
+  if (parsed && typeof parsed === "object" && Array.isArray(parsed.proxies)) {
+    assertProxyCount(parsed.proxies.length, maxProxies);
+    return parsed.proxies;
+  }
 
-  return sourceText
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .filter((line) => isProxyLink(line))
-    .map((line) => parseProxyLink(line, options));
+  return parseProxyLines(sourceText, options, maxProxies);
 }
 
 export function filterSupportedProxies(proxies, target) {

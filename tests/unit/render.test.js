@@ -55,12 +55,7 @@ describe("renderConfig", () => {
     vi.spyOn(subscriptionCache, "getCachedSubscription").mockResolvedValue(null);
     vi.spyOn(subscriptionCache, "putCachedSubscription").mockResolvedValue(undefined);
     vi.spyOn(subscriptionCache, "fetchSubscription").mockResolvedValue({
-      body: encodeBase64UrlText(
-        [
-          "ss://YWVzLTI1Ni1nY206cGFzc0BleGFtcGxlLmNvbTo4NDQz#香港入口",
-          "trojan://secret@example.com:443#美国入口"
-        ].join("\n")
-      ),
+      body: encodeBase64UrlText(["ss://YWVzLTI1Ni1nY206cGFzc0BleGFtcGxlLmNvbTo4NDQz#香港入口", "trojan://secret@example.com:443#美国入口"].join("\n")),
       subscriptionUserinfo: "upload=1; download=2; total=3; expire=4"
     });
   });
@@ -111,46 +106,50 @@ describe("renderConfig", () => {
 
   it("规则增强通过内部覆写生成 provider 和规则，并保持 MATCH 兜底在最后", async () => {
     const env = createEnv();
-    const result = await renderConfig(env, new Request("https://app.example.com/"), createConfig({
-      sources: {
-        subscriptions: [],
-        nodes: ["ss://YWVzLTI1Ni1nY206cGFzc0BleGFtcGxlLmNvbTo4NDQz#RoutingNode"]
-      },
-      routing: {
-        ruleProviders: [
-          {
-            name: "前置集",
-            behavior: "domain",
-            url: "https://rules.example.com/pre.yaml",
-            group: "节点选择",
-            prepend: true
-          },
-          {
-            name: "后置集",
-            behavior: "classical",
-            url: "https://rules.example.com/post.yaml",
-            group: "国外媒体",
-            prepend: false
-          }
-        ],
-        rules: [
-          { value: "DOMAIN-SUFFIX,prepend.example,DIRECT", prepend: true },
-          { value: "DOMAIN-SUFFIX,append.example,节点选择", prepend: false }
-        ]
-      }
-    }));
+    const result = await renderConfig(
+      env,
+      new Request("https://app.example.com/"),
+      createConfig({
+        sources: {
+          subscriptions: [],
+          nodes: ["ss://YWVzLTI1Ni1nY206cGFzc0BleGFtcGxlLmNvbTo4NDQz#RoutingNode"]
+        },
+        routing: {
+          ruleProviders: [
+            {
+              name: "前置集",
+              behavior: "domain",
+              url: "https://rules.example.com/pre.yaml",
+              group: "节点选择",
+              prepend: true
+            },
+            {
+              name: "后置集",
+              behavior: "classical",
+              url: "https://rules.example.com/post.yaml",
+              group: "国外媒体",
+              prepend: false
+            }
+          ],
+          rules: [
+            { value: "DOMAIN-SUFFIX,prepend.example,DIRECT", prepend: true },
+            { value: "DOMAIN-SUFFIX,append.example,节点选择", prepend: false }
+          ]
+        }
+      })
+    );
 
     const parsed = YAML.parse(result.yaml);
 
     expect(parsed["rule-providers"]).toEqual({
-      "前置集": {
+      前置集: {
         type: "http",
         behavior: "domain",
         url: "https://rules.example.com/pre.yaml",
         path: "./providers/前置集.yaml",
         interval: 3600
       },
-      "后置集": {
+      后置集: {
         type: "http",
         behavior: "classical",
         url: "https://rules.example.com/post.yaml",
@@ -173,19 +172,19 @@ describe("renderConfig", () => {
 
   it("开启自动旗帜时会补齐未带旗帜的节点名且不重复添加", async () => {
     const env = createEnv();
-    const result = await renderConfig(env, new Request("https://app.example.com/"), createConfig({
-      sources: {
-        subscriptions: [],
-        nodes: [
-          "ss://YWVzLTI1Ni1nY206cGFzc0BleGFtcGxlLmNvbTo4NDQz#香港入口",
-          "trojan://secret@example.com:443#🇺🇸 美国入口",
-          "trojan://secret2@example.net:443#未知节点"
-        ]
-      },
-      options: {
-        autoFlag: true
-      }
-    }));
+    const result = await renderConfig(
+      env,
+      new Request("https://app.example.com/"),
+      createConfig({
+        sources: {
+          subscriptions: [],
+          nodes: ["ss://YWVzLTI1Ni1nY206cGFzc0BleGFtcGxlLmNvbTo4NDQz#香港入口", "trojan://secret@example.com:443#🇺🇸 美国入口", "trojan://secret2@example.net:443#未知节点"]
+        },
+        options: {
+          autoFlag: true
+        }
+      })
+    );
 
     const proxyNames = YAML.parse(result.yaml).proxies.map((proxy) => proxy.name);
     expect(proxyNames).toContain("🇭🇰 香港入口");
@@ -240,12 +239,16 @@ describe("renderConfig", () => {
 
   it("在 meta 目标下会保留 ssh 节点并输出密码模式字段", async () => {
     const env = createEnv();
-    const result = await renderConfig(env, new Request("https://app.example.com/"), createConfig({
-      sources: {
-        subscriptions: [],
-        nodes: ["ssh://demo%2Buser:p%40ss%3Aword@ssh.example.com:22#SSHMeta"]
-      }
-    }));
+    const result = await renderConfig(
+      env,
+      new Request("https://app.example.com/"),
+      createConfig({
+        sources: {
+          subscriptions: [],
+          nodes: ["ssh://demo%2Buser:p%40ss%3Aword@ssh.example.com:22#SSHMeta"]
+        }
+      })
+    );
 
     const parsed = YAML.parse(result.yaml);
 
@@ -264,14 +267,16 @@ describe("renderConfig", () => {
 
   it("在 meta 目标下会保留 wireguard 节点并输出对应字段", async () => {
     const env = createEnv();
-    const result = await renderConfig(env, new Request("https://app.example.com/"), createConfig({
-      sources: {
-        subscriptions: [],
-        nodes: [
-          "wireguard://cHJpdmF0ZS1rZXktcGxhY2Vob2xkZXI=@wg.example.com:51820?public-key=cHVibGljLWtleS1wbGFjZWhvbGRlcg%3D%3D&ip=172.16.0.2%2F32&dns=1.1.1.1&udp=1#WireGuardMeta"
-        ]
-      }
-    }));
+    const result = await renderConfig(
+      env,
+      new Request("https://app.example.com/"),
+      createConfig({
+        sources: {
+          subscriptions: [],
+          nodes: ["wireguard://cHJpdmF0ZS1rZXktcGxhY2Vob2xkZXI=@wg.example.com:51820?public-key=cHVibGljLWtleS1wbGFjZWhvbGRlcg%3D%3D&ip=172.16.0.2%2F32&dns=1.1.1.1&udp=1#WireGuardMeta"]
+        }
+      })
+    );
 
     const parsed = YAML.parse(result.yaml);
 
@@ -308,9 +313,7 @@ describe("renderConfig", () => {
       target: "meta",
       sources: {
         subscriptions: [],
-        nodes: [
-          "ss://YWVzLTI1Ni1nY206cGFzc0BleGFtcGxlLmNvbTo4NDQz#BuiltinSafe"
-        ]
+        nodes: ["ss://YWVzLTI1Ni1nY206cGFzc0BleGFtcGxlLmNvbTo4NDQz#BuiltinSafe"]
       },
       template: {
         mode: "builtin",
@@ -385,33 +388,37 @@ describe("renderConfig", () => {
 
   it("用户覆写会覆盖规则增强生成的同名 rule provider", async () => {
     const env = createEnv();
-    const result = await renderConfig(env, new Request("https://app.example.com/sub/demo"), createConfig({
-      sources: {
-        subscriptions: [],
-        nodes: ["ss://YWVzLTI1Ni1nY206cGFzc0BleGFtcGxlLmNvbTo4NDQz#OverrideProvider"]
-      },
-      routing: {
-        ruleProviders: [
-          {
-            name: "自定义集",
-            behavior: "domain",
-            url: "https://rules.example.com/generated.yaml",
-            group: "节点选择",
-            prepend: false
-          }
-        ],
-        rules: []
-      },
-      override: {
-        type: "yaml",
-        content: `"rule-providers":
+    const result = await renderConfig(
+      env,
+      new Request("https://app.example.com/sub/demo"),
+      createConfig({
+        sources: {
+          subscriptions: [],
+          nodes: ["ss://YWVzLTI1Ni1nY206cGFzc0BleGFtcGxlLmNvbTo4NDQz#OverrideProvider"]
+        },
+        routing: {
+          ruleProviders: [
+            {
+              name: "自定义集",
+              behavior: "domain",
+              url: "https://rules.example.com/generated.yaml",
+              group: "节点选择",
+              prepend: false
+            }
+          ],
+          rules: []
+        },
+        override: {
+          type: "yaml",
+          content: `"rule-providers":
   自定义集!:
     type: file
     behavior: classical
     path: ./manual.yaml
 `
-      }
-    }));
+        }
+      })
+    );
 
     const parsed = YAML.parse(result.yaml);
     expect(parsed["rule-providers"]["自定义集"]).toEqual({
@@ -440,28 +447,32 @@ rules:
 `
     });
 
-    const result = await renderConfig(env, new Request("https://app.example.com/sub/demo"), createConfig({
-      sources: {
-        subscriptions: [],
-        nodes: ["ss://YWVzLTI1Ni1nY206cGFzc0BleGFtcGxlLmNvbTo4NDQz#ReplaceProvider"]
-      },
-      template: {
-        mode: "custom",
-        value: template.id
-      },
-      routing: {
-        ruleProviders: [
-          {
-            name: "同名集",
-            behavior: "domain",
-            url: "https://rules.example.com/current.yaml",
-            group: "节点选择",
-            prepend: false
-          }
-        ],
-        rules: []
-      }
-    }));
+    const result = await renderConfig(
+      env,
+      new Request("https://app.example.com/sub/demo"),
+      createConfig({
+        sources: {
+          subscriptions: [],
+          nodes: ["ss://YWVzLTI1Ni1nY206cGFzc0BleGFtcGxlLmNvbTo4NDQz#ReplaceProvider"]
+        },
+        template: {
+          mode: "custom",
+          value: template.id
+        },
+        routing: {
+          ruleProviders: [
+            {
+              name: "同名集",
+              behavior: "domain",
+              url: "https://rules.example.com/current.yaml",
+              group: "节点选择",
+              prepend: false
+            }
+          ],
+          rules: []
+        }
+      })
+    );
 
     const parsed = YAML.parse(result.yaml);
     expect(parsed["rule-providers"]["同名集"]).toEqual({
@@ -481,10 +492,7 @@ rules:
       target: "meta",
       sources: {
         subscriptions: [],
-        nodes: [
-          "ss://YWVzLTI1Ni1nY206cGFzc0BleGFtcGxlLmNvbTo4NDQz#香港A | 落地",
-          "trojan://secret@example.com:443#美国B"
-        ]
+        nodes: ["ss://YWVzLTI1Ni1nY206cGFzc0BleGFtcGxlLmNvbTo4NDQz#香港A | 落地", "trojan://secret@example.com:443#美国B"]
       },
       template: {
         mode: "builtin",
@@ -561,10 +569,7 @@ rules:
       target: "meta",
       sources: {
         subscriptions: [],
-        nodes: [
-          "ss://YWVzLTI1Ni1nY206cGFzc0BleGFtcGxlLmNvbTo4NDQz#节点甲",
-          "trojan://secret@example.com:443#节点乙"
-        ]
+        nodes: ["ss://YWVzLTI1Ni1nY206cGFzc0BleGFtcGxlLmNvbTo4NDQz#节点甲", "trojan://secret@example.com:443#节点乙"]
       },
       template: {
         mode: "builtin",
@@ -710,6 +715,91 @@ rules:
     expect(subscriptionCache.fetchSubscription).not.toHaveBeenCalled();
   });
 
+  it("同域短链聚合会传递子链覆写后的结构化节点", async () => {
+    const env = createEnv();
+    const child = await createLink(
+      env,
+      createConfig({
+        sources: {
+          subscriptions: [],
+          nodes: ["ss://YWVzLTI1Ni1nY206cGFzc0BleGFtcGxlLmNvbTo4NDQz#Child"]
+        },
+        override: {
+          type: "yaml",
+          content: "proxies!:\n  - name: ChildOverride\n    type: ss\n    server: child.example.com\n    port: 443\n    cipher: aes-128-gcm\n    password: child-password\n"
+        }
+      })
+    );
+    const parent = createConfig({
+      sources: {
+        subscriptions: [{ url: `https://app.example.com/s/${child.id}`, remark: "" }],
+        nodes: []
+      }
+    });
+    const result = await renderConfig(env, new Request("https://app.example.com/sub/parent"), parent);
+
+    expect(result.yaml).toContain("ChildOverride");
+    expect(result.yaml).not.toContain("name: Child\n");
+  });
+
+  it("默认拒绝超过 100 个内联节点或 10 个订阅源的配置", async () => {
+    const env = createEnv();
+    const node = "ss://YWVzLTI1Ni1nY206cGFzc0BleGFtcGxlLmNvbTo4NDQz#Node";
+
+    await expect(
+      renderConfig(
+        env,
+        new Request("https://app.example.com/"),
+        createConfig({
+          sources: {
+            subscriptions: [],
+            nodes: Array.from({ length: 101 }, () => node)
+          }
+        })
+      )
+    ).rejects.toMatchObject({ message: "节点数量不能超过 100" });
+
+    await expect(
+      renderConfig(
+        env,
+        new Request("https://app.example.com/"),
+        createConfig({
+          sources: {
+            subscriptions: Array.from({ length: 11 }, (_, index) => ({
+              url: `https://sub.example.com/${index}`,
+              remark: ""
+            })),
+            nodes: []
+          }
+        })
+      )
+    ).rejects.toMatchObject({ message: "订阅源数量不能超过 10" });
+  });
+
+  it("会为内联节点预留远程订阅的节点容量", async () => {
+    const env = createEnv({ MAX_PROXY_COUNT: "2" });
+    subscriptionCache.fetchSubscription.mockResolvedValue({
+      body: [
+        "ss://YWVzLTI1Ni1nY206cGFzc0BhLmV4YW1wbGUuY29tOjQ0Mw#RemoteA",
+        "ss://YWVzLTI1Ni1nY206cGFzc0BiLmV4YW1wbGUuY29tOjQ0Mw#RemoteB"
+      ].join("\n"),
+      subscriptionUserinfo: ""
+    });
+
+    await expect(
+      renderConfig(
+        env,
+        new Request("https://app.example.com/"),
+        createConfig({
+          sources: {
+            subscriptions: [{ url: "https://sub.example.com/limited", remark: "" }],
+            nodes: ["ss://YWVzLTI1Ni1nY206cGFzc0BjLmV4YW1wbGUuY29tOjQ0Mw#Inline"]
+          }
+        })
+      )
+    ).rejects.toMatchObject({ message: "节点数量不能超过 1" });
+  });
+
   it("同域短链循环引用会直接返回 422", async () => {
     const env = createEnv();
     const linkA = await createLink(
@@ -742,9 +832,7 @@ rules:
       })
     );
 
-    await expect(
-      renderLink(env, new Request(`https://app.example.com/s/${linkA.id}`), linkA.id)
-    ).rejects.toMatchObject({
+    await expect(renderLink(env, new Request(`https://app.example.com/s/${linkA.id}`), linkA.id)).rejects.toMatchObject({
       status: 422,
       message: "检测到订阅链接循环引用",
       details: `https://app.example.com/s/${linkA.id}`

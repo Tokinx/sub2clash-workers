@@ -27,6 +27,9 @@
 - `override.content` 同时支持基础 merge 语法和项目自定义的 `$patches` / `$select` 扩展
 - `options.autoFlag`：默认 `false`；开启后会按节点名识别国家/地区并为未包含旗帜的节点名前缀对应 emoji 旗帜
 - 当 `options.nodeList = true` 且存在规则增强或覆写内容时，接口仍正常返回 YAML，但 `warnings` 会提示对应配置已被忽略
+- 单次配置默认最多包含 10 个订阅源，由 `MAX_SUBSCRIPTION_COUNT` 调整
+- 单次渲染默认最多处理 100 个输入节点，由 `MAX_PROXY_COUNT` 调整；远程订阅、内联节点、同域订阅及模板/覆写最终结果均受此限制
+- `options.refresh = true` 会绕过远程订阅 KV 缓存；当前不缓存最终 YAML
 
 ## 短链
 

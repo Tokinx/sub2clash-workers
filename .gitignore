@@ -6,3 +6,4 @@ public/
 bun.lock
 .dev.vars
 wrangler.local.jsonc
+.tasks/0.next.md

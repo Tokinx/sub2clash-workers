@@ -80,6 +80,8 @@ SESSION_SECRET=replace-with-a-random-secret
 SESSION_TTL_SECONDS=2592000
 SUB_CACHE_TTL_SECONDS=300
 MAX_REMOTE_FILE_SIZE=1048576
+MAX_PROXY_COUNT=100
+MAX_SUBSCRIPTION_COUNT=10
 ```
 
 2. 启动统一开发入口
@@ -92,13 +94,15 @@ bun run dev
 
 ## 环境变量与 Secret
 
-| 变量名                  | 必需 | 说明                     | 默认值       |
-| ----------------------- | ---- | ------------------------ | ------------ |
-| `APP_PASSWORD`          | ✓    | 管理台登录密码           | -            |
-| `SESSION_SECRET`        | ✓    | 会话签名密钥             | -            |
-| `SESSION_TTL_SECONDS`   | -    | Cookie 会话有效期        | 2592000 秒   |
-| `SUB_CACHE_TTL_SECONDS` | -    | 远程订阅缓存 TTL         | 300 秒       |
-| `MAX_REMOTE_FILE_SIZE`  | -    | 单次远程订阅拉取大小上限 | 1048576 字节 |
+| 变量名                   | 必需 | 说明                         | 默认值       |
+| ------------------------ | ---- | ---------------------------- | ------------ |
+| `APP_PASSWORD`           | ✓    | 管理台登录密码               | -            |
+| `SESSION_SECRET`         | ✓    | 会话签名密钥                 | -            |
+| `SESSION_TTL_SECONDS`    | -    | Cookie 会话有效期            | 2592000 秒   |
+| `SUB_CACHE_TTL_SECONDS`  | -    | 远程订阅缓存 TTL             | 300 秒       |
+| `MAX_REMOTE_FILE_SIZE`   | -    | 单次远程订阅拉取大小上限     | 1048576 字节 |
+| `MAX_PROXY_COUNT`        | -    | 单次渲染最多处理的输入节点数 | 100          |
+| `MAX_SUBSCRIPTION_COUNT` | -    | 单份配置最多包含的订阅源数量 | 10           |
 
 ## 补充说明
 
@@ -108,24 +112,24 @@ bun run dev
 
 当前采用“`server:port` + query 参数”的连接字符串格式：
 
-| 参数 | 必填 | 说明 | 别名 / 备注 |
-| --- | --- | --- | --- |
-| `server` | 是 | 节点服务器地址，放在 URL host 部分 | 例如 `wg.example.com` |
-| `port` | 是 | 节点端口，放在 URL port 部分 | 例如 `51820` |
-| `private-key` | 是 | WireGuard 私钥 | 支持 `private_key` / `privatekey` / `secret-key` / `secretkey`；也可直接放在 URL username 部分 |
-| `public-key` | 是 | Peer 公钥 | 支持 `public_key` / `publickey` / `peer-public-key` / `peer_public_key` |
-| `ip` | 是 | 本地 IPv4 地址/CIDR | 例如 `172.16.0.2/32` |
-| `ipv6` | 否 | 本地 IPv6 地址/CIDR | 可与 `ip` 同时使用 |
-| `address` | 否 | 一次传入 IPv4 和 IPv6 本地地址 | 支持 `addresses` / `local-address` / `local_address`；例如 `172.16.0.2/32,2606:.../128` |
-| `dns` | 否 | DNS 列表 | 多个值用英文逗号分隔 |
-| `pre-shared-key` | 否 | 预共享密钥 | 无 |
-| `mtu` | 否 | MTU | 整数 |
-| `reserved` | 否 | Reserved 值 | 可传 `1,2,3` 这类数组 |
-| `udp` | 否 | 是否显式输出 UDP 字段 | 支持 `1` / `true` / `false` |
-| `dialer-proxy` | 否 | 绑定前置节点名 | 支持 `dialer_proxy` / `dialerProxy` |
-| `allowed-ips` | 否 | Allowed IPs 列表 | 支持 `allowed_ips` / `allowedips`；默认 `0.0.0.0/0` |
-| `persistent-keepalive` | 否 | Persistent Keepalive | 支持 `persistent_keepalive` / `persistentKeepalive` |
-| `remote-dns-resolve` | 否 | 是否启用远端 DNS 解析 | 支持 `remote_dns_resolve` / `remoteDnsResolve` |
+| 参数                   | 必填 | 说明                               | 别名 / 备注                                                                                    |
+| ---------------------- | ---- | ---------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `server`               | 是   | 节点服务器地址，放在 URL host 部分 | 例如 `wg.example.com`                                                                          |
+| `port`                 | 是   | 节点端口，放在 URL port 部分       | 例如 `51820`                                                                                   |
+| `private-key`          | 是   | WireGuard 私钥                     | 支持 `private_key` / `privatekey` / `secret-key` / `secretkey`；也可直接放在 URL username 部分 |
+| `public-key`           | 是   | Peer 公钥                          | 支持 `public_key` / `publickey` / `peer-public-key` / `peer_public_key`                        |
+| `ip`                   | 是   | 本地 IPv4 地址/CIDR                | 例如 `172.16.0.2/32`                                                                           |
+| `ipv6`                 | 否   | 本地 IPv6 地址/CIDR                | 可与 `ip` 同时使用                                                                             |
+| `address`              | 否   | 一次传入 IPv4 和 IPv6 本地地址     | 支持 `addresses` / `local-address` / `local_address`；例如 `172.16.0.2/32,2606:.../128`        |
+| `dns`                  | 否   | DNS 列表                           | 多个值用英文逗号分隔                                                                           |
+| `pre-shared-key`       | 否   | 预共享密钥                         | 无                                                                                             |
+| `mtu`                  | 否   | MTU                                | 整数                                                                                           |
+| `reserved`             | 否   | Reserved 值                        | 可传 `1,2,3` 这类数组                                                                          |
+| `udp`                  | 否   | 是否显式输出 UDP 字段              | 支持 `1` / `true` / `false`                                                                    |
+| `dialer-proxy`         | 否   | 绑定前置节点名                     | 支持 `dialer_proxy` / `dialerProxy`                                                            |
+| `allowed-ips`          | 否   | Allowed IPs 列表                   | 支持 `allowed_ips` / `allowedips`；默认 `0.0.0.0/0`                                            |
+| `persistent-keepalive` | 否   | Persistent Keepalive               | 支持 `persistent_keepalive` / `persistentKeepalive`                                            |
+| `remote-dns-resolve`   | 否   | 是否启用远端 DNS 解析              | 支持 `remote_dns_resolve` / `remoteDnsResolve`                                                 |
 
 示例：
 
@@ -151,13 +155,13 @@ ssh://username:password@ssh.example.com:22#SSH-Node
 
 字段约定：
 
-| 参数 | 必填 | 说明 | 备注 |
-| --- | --- | --- | --- |
-| `username` | 是 | SSH 用户名 | 放在 URL username 部分 |
-| `password` | 是 | SSH 密码 | 放在 URL password 部分，若包含 `@`、`:`、`/` 等字符需先做 URL encode |
-| `server` | 是 | SSH 服务端地址 | 放在 URL host 部分 |
-| `port` | 是 | SSH 服务端端口 | 放在 URL port 部分 |
-| `name` | 否 | 节点名 | 放在 URL fragment 部分，缺省时回退为 `server:port` |
+| 参数       | 必填 | 说明           | 备注                                                                 |
+| ---------- | ---- | -------------- | -------------------------------------------------------------------- |
+| `username` | 是   | SSH 用户名     | 放在 URL username 部分                                               |
+| `password` | 是   | SSH 密码       | 放在 URL password 部分，若包含 `@`、`:`、`/` 等字符需先做 URL encode |
+| `server`   | 是   | SSH 服务端地址 | 放在 URL host 部分                                                   |
+| `port`     | 是   | SSH 服务端端口 | 放在 URL port 部分                                                   |
+| `name`     | 否   | 节点名         | 放在 URL fragment 部分，缺省时回退为 `server:port`                   |
 
 ## 相关文档
 

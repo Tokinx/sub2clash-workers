@@ -17,6 +17,34 @@ function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+const DEFAULT_MAX_PROXY_COUNT = 100;
+const DEFAULT_MAX_SUBSCRIPTION_COUNT = 10;
+
+function getPositiveInteger(value, fallback) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function getWorkloadLimits(env) {
+  return {
+    maxProxyCount: getPositiveInteger(env.MAX_PROXY_COUNT, DEFAULT_MAX_PROXY_COUNT),
+    maxSubscriptionCount: getPositiveInteger(env.MAX_SUBSCRIPTION_COUNT, DEFAULT_MAX_SUBSCRIPTION_COUNT)
+  };
+}
+
+function assertProxyCount(count, limit) {
+  if (count > limit) {
+    throw badRequest(`节点数量不能超过 ${limit}`);
+  }
+}
+
+function assertWorkloadConfig(config, limits) {
+  if (config.sources.subscriptions.length > limits.maxSubscriptionCount) {
+    throw badRequest(`订阅源数量不能超过 ${limits.maxSubscriptionCount}`);
+  }
+  assertProxyCount(config.sources.nodes.length, limits.maxProxyCount);
+}
+
 function createRenderContext(context) {
   if (context?.activeLocalSubscriptionUrls instanceof Set) {
     return context;
@@ -115,16 +143,11 @@ async function resolveLocalSubscription(env, request, subscriptionUrl, context) 
   const localRequest = createInternalRequest(request, localTarget.targetUrl);
   const result =
     localTarget.type === "short"
-      ? await renderLink(env, localRequest, localTarget.id, context)
-      : await renderConfig(
-          env,
-          localRequest,
-          JSON.parse(decodeBase64UrlText(localTarget.payload)),
-          context
-        );
+      ? await renderLinkData(env, localRequest, localTarget.id, context)
+      : await renderConfigData(env, localRequest, JSON.parse(decodeBase64UrlText(localTarget.payload)), context);
 
   return {
-    body: result.yaml,
+    proxies: Array.isArray(result.output.proxies) ? result.output.proxies : [],
     subscriptionUserinfo: result.subscriptionUserinfo || ""
   };
 }
@@ -149,9 +172,7 @@ function ensureTemplateShape(templateObject) {
   return {
     ...templateObject,
     proxies: Array.isArray(templateObject.proxies) ? templateObject.proxies : [],
-    "proxy-groups": Array.isArray(templateObject["proxy-groups"])
-      ? templateObject["proxy-groups"]
-      : [],
+    "proxy-groups": Array.isArray(templateObject["proxy-groups"]) ? templateObject["proxy-groups"] : [],
     rules: Array.isArray(templateObject.rules) ? templateObject.rules : [],
     "rule-providers":
       templateObject["rule-providers"] && typeof templateObject["rule-providers"] === "object"
@@ -351,10 +372,7 @@ function buildRoutingOverride(baseConfig, routing) {
   );
 
   if (prependProviders.length > 0) {
-    rules = [
-      ...prependProviders.map((provider) => `RULE-SET,${provider.name},${provider.group}`),
-      ...rules
-    ];
+    rules = [...prependProviders.map((provider) => `RULE-SET,${provider.name},${provider.group}`), ...rules];
   }
   if (appendProviders.length > 0) {
     rules = appendRulesKeepingMatchLast(
@@ -401,7 +419,7 @@ function mergeTemplate(templateContent, proxies, countryGroups, config) {
     throw unprocessable("模板 YAML 解析失败", error instanceof Error ? error.message : String(error));
   }
 
-  const next = clone(templateObject);
+  const next = templateObject;
   const proxyNames = proxies.map((proxy) => proxy.name);
   next.proxies = [...next.proxies, ...proxies];
   next["proxy-groups"] = next["proxy-groups"].map((group) =>
@@ -417,7 +435,7 @@ function mergeTemplate(templateContent, proxies, countryGroups, config) {
   return next;
 }
 
-async function collectRemoteProxies(env, request, config, context) {
+async function collectRemoteProxies(env, request, config, context, limits) {
   const result = [];
   let subscriptionUserinfo = "";
 
@@ -443,7 +461,13 @@ async function collectRemoteProxies(env, request, config, context) {
       }
     }
 
-    const proxies = parseSubscriptionBody(payload.body, config.options);
+    const remaining = limits.maxProxyCount - result.length - config.sources.nodes.length;
+    const proxies = Array.isArray(payload.proxies)
+      ? payload.proxies
+      : parseSubscriptionBody(payload.body, config.options, {
+          maxProxies: remaining
+        });
+    assertProxyCount(proxies.length, remaining);
     result.push(...proxies);
 
     if (index === 0 && config.sources.subscriptions.length === 1) {
@@ -461,16 +485,19 @@ function collectInlineProxies(config) {
   return config.sources.nodes.map((node) => parseProxyLink(node, config.options));
 }
 
-export async function renderConfig(env, request, inputConfig, context) {
+async function renderConfigData(env, request, inputConfig, context) {
   const renderContext = createRenderContext(context);
 
   return withActiveLocalSubscription(renderContext, request, async () => {
     const config = validateAndNormalizeConfig(inputConfig);
+    const limits = getWorkloadLimits(env);
+    assertWorkloadConfig(config, limits);
     const template = await loadTemplate(env, request, config);
-    const remote = await collectRemoteProxies(env, request, config, renderContext);
+    const remote = await collectRemoteProxies(env, request, config, renderContext, limits);
     const inline = collectInlineProxies(config);
 
     let proxies = [...remote.proxies, ...inline];
+    assertProxyCount(proxies.length, limits.maxProxyCount);
     proxies = filterSupportedProxies(proxies, config.target);
     proxies = dedupeProxies(proxies);
     proxies = applyFilterAndReplace(proxies, config);
@@ -480,13 +507,8 @@ export async function renderConfig(env, request, inputConfig, context) {
     if (config.options.nodeList) {
       const warnings = buildNodeListWarnings(config);
 
-      const yaml = YAML.stringify(
-        deepClean({
-          proxies
-        })
-      );
       return {
-        yaml,
+        output: deepClean({ proxies }),
         stats: {
           proxyCount: proxies.length,
           countryGroupCount: countryGroups.length,
@@ -498,7 +520,9 @@ export async function renderConfig(env, request, inputConfig, context) {
     }
 
     let merged = mergeTemplate(template.content, proxies, countryGroups, config);
-    merged = applyParsedOverride(merged, buildRoutingOverride(merged, config.routing));
+    if (hasRoutingEnhancements(config.routing)) {
+      merged = applyParsedOverride(merged, buildRoutingOverride(merged, config.routing));
+    }
     merged = applyYamlOverride(merged, config.override.content);
     if (Array.isArray(merged["proxy-groups"])) {
       const proxyNames = proxies.map((proxy) => proxy.name);
@@ -506,11 +530,11 @@ export async function renderConfig(env, request, inputConfig, context) {
         expandGroupPlaceholders(group, proxyNames, countryGroups, config.options.ignoreCountryGroup)
       );
     }
-    const yaml = YAML.stringify(deepClean(merged));
+    assertProxyCount(Array.isArray(merged.proxies) ? merged.proxies.length : 0, limits.maxProxyCount);
     const warnings = [];
 
     return {
-      yaml,
+      output: deepClean(merged),
       stats: {
         proxyCount: proxies.length,
         countryGroupCount: countryGroups.length,
@@ -522,7 +546,25 @@ export async function renderConfig(env, request, inputConfig, context) {
   });
 }
 
-export async function renderLink(env, request, id, context) {
+export async function renderConfig(env, request, inputConfig, context) {
+  const result = await renderConfigData(env, request, inputConfig, context);
+  const { output, ...metadata } = result;
+  return {
+    yaml: YAML.stringify(output),
+    ...metadata
+  };
+}
+
+async function renderLinkData(env, request, id, context) {
   const record = await getLink(env, id);
-  return renderConfig(env, request, record.config, context);
+  return renderConfigData(env, request, record.config, context);
+}
+
+export async function renderLink(env, request, id, context) {
+  const result = await renderLinkData(env, request, id, context);
+  const { output, ...metadata } = result;
+  return {
+    yaml: YAML.stringify(output),
+    ...metadata
+  };
 }
