@@ -16,9 +16,12 @@ const SUPPORT_MATRIX = {
     "socks5",
     "anytls",
     "wireguard",
-    "ssh"
+    "ssh",
+    "snell"
   ])
 };
+
+const SNELL_OBFS_MODES = new Set(["http", "tls", "shadow-tls"]);
 
 function parsePort(value) {
   const port = Number(value);
@@ -491,6 +494,40 @@ function parseSsh(proxy) {
   };
 }
 
+function parseSnell(proxy) {
+  const link = new URL(proxy);
+  const psk = decodeUrlComponentSafe(link.username);
+  const obfsMode = link.searchParams.get("obfs") || undefined;
+  const obfsHost = link.searchParams.get("obfs-host") || undefined;
+
+  if (!psk) {
+    throw badRequest("Snell psk 缺失");
+  }
+  if (obfsMode && !SNELL_OBFS_MODES.has(obfsMode)) {
+    throw badRequest("Snell obfs 无效");
+  }
+  if (obfsHost && !obfsMode) {
+    throw badRequest("Snell obfs-host 需要 obfs");
+  }
+
+  return {
+    type: "snell",
+    name: getNameFromUrl(link),
+    server: link.hostname,
+    port: parsePort(link.port),
+    psk,
+    version: link.searchParams.has("version")
+      ? parseInteger(link.searchParams.get("version"), "Snell version", { min: 1, max: 5 })
+      : 1,
+    "obfs-opts": obfsMode
+      ? {
+          mode: obfsMode,
+          host: obfsHost
+        }
+      : undefined
+  };
+}
+
 function parseWireGuard(proxy, options) {
   const link = new URL(proxy.replace(/^wg:\/\//, "wireguard://"));
   const query = link.searchParams;
@@ -572,6 +609,7 @@ const PARSERS = [
   ["socks5://", parseSocks],
   ["anytls://", parseAnytls],
   ["ssh://", parseSsh],
+  ["snell://", parseSnell],
   ["wireguard://", parseWireGuard],
   ["wg://", parseWireGuard]
 ];

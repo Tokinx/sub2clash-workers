@@ -21,7 +21,7 @@
 输入侧当前支持以下分享协议：
 
 - Clash：`ss`、`ssr`、`vmess`、`trojan`、`socks5`
-- Clash.Meta：`ss`、`ssr`、`vmess`、`vless`、`trojan`、`hysteria`、`hysteria2`、`socks5`、`anytls`、`wireguard`、`ssh`
+- Clash.Meta：`ss`、`ssr`、`vmess`、`vless`、`trojan`、`hysteria`、`hysteria2`、`socks5`、`anytls`、`wireguard`、`ssh`、`snell`
 
 远程订阅内容支持两类格式：
 
@@ -162,6 +162,26 @@ ssh://username:password@ssh.example.com:22#SSH-Node
 | `server`   | 是   | SSH 服务端地址 | 放在 URL host 部分                                                   |
 | `port`     | 是   | SSH 服务端端口 | 放在 URL port 部分                                                   |
 | `name`     | 否   | 节点名         | 放在 URL fragment 部分，缺省时回退为 `server:port`                   |
+
+### Snell 分享链接
+
+`snell` 当前仅用于 `Clash.Meta / Mihomo` 目标，采用标准 URL 形式：
+
+```text
+snell://psk@snell.example.com:44046?version=3&obfs=http&obfs-host=cdn.example.com#Snell-Node
+```
+
+字段约定：
+
+| 参数        | 必填 | 说明                       | 备注                                                    |
+| ----------- | ---- | -------------------------- | ------------------------------------------------------- |
+| `psk`       | 是   | Snell 预共享密钥           | 放在 URL username 部分；特殊字符需先做 URL encode       |
+| `server`    | 是   | Snell 服务端地址           | 放在 URL host 部分                                      |
+| `port`      | 是   | Snell 服务端端口           | 放在 URL port 部分                                      |
+| `version`   | 否   | Snell 协议版本             | 仅支持 `1` 至 `5`；缺省时输出 `1`                       |
+| `obfs`      | 否   | 混淆模式                   | 支持 `http`、`tls`、`shadow-tls`，映射为 `obfs-opts.mode` |
+| `obfs-host` | 否   | 混淆主机名                 | 需与 `obfs` 一同使用，映射为 `obfs-opts.host`           |
+| `name`      | 否   | 节点名                     | 放在 URL fragment 部分，缺省时回退为 `server:port`      |
 
 ## 相关文档
 

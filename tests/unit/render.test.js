@@ -202,6 +202,7 @@ describe("renderConfig", () => {
         nodes: [
           "vless://12345678-1234-1234-1234-1234567890ab@example.com:443?type=ws&security=tls&host=example.com&path=%2Fws#MetaOnly",
           "ssh://demo-user:demo-pass@ssh.example.com:22#SSHOnly",
+          "snell://placeholder-psk@snell.example.com:44046?version=3#SnellOnly",
           "wireguard://cHJpdmF0ZS1rZXktcGxhY2Vob2xkZXI=@wg.example.com:51820?public-key=cHVibGljLWtleS1wbGFjZWhvbGRlcg%3D%3D&ip=172.16.0.2%2F32#WireGuardOnly",
           "ss://YWVzLTI1Ni1nY206cGFzc0BleGFtcGxlLmNvbTo4NDQz#ClashOK"
         ]
@@ -233,6 +234,7 @@ describe("renderConfig", () => {
     expect(result.yaml).toContain("ClashOK");
     expect(result.yaml).not.toContain("MetaOnly");
     expect(result.yaml).not.toContain("SSHOnly");
+    expect(result.yaml).not.toContain("SnellOnly");
     expect(result.yaml).not.toContain("WireGuardOnly");
     expect(result.stats.proxyCount).toBe(1);
   });
@@ -291,6 +293,38 @@ describe("renderConfig", () => {
         "public-key": "cHVibGljLWtleS1wbGFjZWhvbGRlcg==",
         dns: ["1.1.1.1"],
         udp: true
+      })
+    ]);
+    expect(result.stats.proxyCount).toBe(1);
+  });
+
+  it("在 meta 目标下会保留 snell 节点并输出混淆字段", async () => {
+    const env = createEnv();
+    const result = await renderConfig(
+      env,
+      new Request("https://app.example.com/"),
+      createConfig({
+        sources: {
+          subscriptions: [],
+          nodes: ["snell://placeholder%2Bpsk@snell.example.com:44046?version=3&obfs=tls&obfs-host=cdn.example.com#SnellMeta"]
+        }
+      })
+    );
+
+    const parsed = YAML.parse(result.yaml);
+
+    expect(parsed.proxies).toEqual([
+      expect.objectContaining({
+        type: "snell",
+        name: "SnellMeta",
+        server: "snell.example.com",
+        port: 44046,
+        psk: "placeholder+psk",
+        version: 3,
+        "obfs-opts": {
+          mode: "tls",
+          host: "cdn.example.com"
+        }
       })
     ]);
     expect(result.stats.proxyCount).toBe(1);

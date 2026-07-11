@@ -31,6 +31,7 @@ describe("协议解析器", () => {
     ["socks5", "socks5://user:pass@example.com:1080#Socks", "socks5"],
     ["anytls", "anytls://password@example.com:443?sni=example.com#AnyTLS", "anytls"],
     ["ssh", "ssh://demo-user:demo-pass@example.com:22#SSH", "ssh"],
+    ["snell", "snell://placeholder-psk@example.com:44046?version=3#Snell", "snell"],
     ["wireguard", `wireguard://${PLACEHOLDER_WG_PRIVATE_KEY}@example.com:51820?public-key=${encodeURIComponent(PLACEHOLDER_WG_PUBLIC_KEY)}&ip=172.16.0.2%2F32#WireGuard`, "wireguard"]
   ];
 
@@ -104,6 +105,40 @@ describe("协议解析器", () => {
         useUDP: false
       })
     ).toThrowError("SSH 节点暂只支持密码认证");
+  });
+
+  it("snell 会解析 URL 编码 PSK、版本与混淆字段", () => {
+    const proxy = parseProxyLink(
+      "snell://placeholder%2Bpsk%2Fvalue@example.com:44046?version=5&obfs=shadow-tls&obfs-host=cdn.example.com#Snell-Encoded"
+    );
+
+    expect(proxy).toEqual({
+      type: "snell",
+      name: "Snell-Encoded",
+      server: "example.com",
+      port: 44046,
+      psk: "placeholder+psk/value",
+      version: 5,
+      "obfs-opts": {
+        mode: "shadow-tls",
+        host: "cdn.example.com"
+      }
+    });
+  });
+
+  it("snell 缺省 version 时输出 1，接受全部受支持的版本", () => {
+    const defaultVersion = parseProxyLink("snell://placeholder-psk@example.com:44046#Snell-Default");
+
+    expect(defaultVersion.version).toBe(1);
+    for (const version of [1, 2, 3, 4, 5]) {
+      expect(parseProxyLink(`snell://placeholder-psk@example.com:44046?version=${version}#Snell-${version}`).version).toBe(version);
+    }
+  });
+
+  it("snell 会拒绝缺失 PSK、非法版本和没有模式的 obfs-host", () => {
+    expect(() => parseProxyLink("snell://@example.com:44046#Snell-NoPsk")).toThrowError("Snell psk 缺失");
+    expect(() => parseProxyLink("snell://placeholder-psk@example.com:44046?version=6#Snell-InvalidVersion")).toThrowError("Snell version 无效");
+    expect(() => parseProxyLink("snell://placeholder-psk@example.com:44046?obfs-host=cdn.example.com#Snell-InvalidObfs")).toThrowError("Snell obfs-host 需要 obfs");
   });
 
   it("wireguard 会解析 Mihomo 所需字段并兼容 wg:// 前缀", () => {

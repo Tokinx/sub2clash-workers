@@ -1,5 +1,24 @@
 # 回归记录
 
+## Snell 连接字符串回归 2026-07-11
+
+- 状态：已完成
+- 目标：为连接字符串转换增加 `snell` 协议支持，并明确其仅在 `Clash.Meta / Mihomo` 目标下保留
+- 变更：
+  - `src/domain/parsers/index.js` 新增 `snell://` 解析器，输出 Mihomo 所需的 `psk`、`version` 与可选 `obfs-opts`
+  - `version` 仅接受 1 至 5，缺省时输出 1；`obfs` 仅接受 `http`、`tls`、`shadow-tls`，`obfs-host` 必须随 `obfs` 一同提供
+  - 协议支持矩阵已更新为仅在 `meta` 目标保留 `snell`，`clash` 目标继续过滤
+  - `README.md`、`docs/architecture.md` 与 `/.tasks/roadmap.md` 已同步更新支持范围和连接字符串约定
+- 测试：
+  - `bun run test:worker -- tests/unit/parsers.test.js tests/unit/render.test.js`
+  - `bun run test`
+- 结果：
+  - 定向 Worker 回归：2 个测试文件、45 个用例通过
+  - 完整回归：Worker 侧 6 个测试文件、63 个用例通过；前端 7 个测试文件、16 个用例通过
+  - 已覆盖 URL 编码 PSK、版本默认值与边界、非法参数、混淆字段映射，以及 `meta` 保留和 `clash` 过滤
+- 现存风险：
+  - 当前仅支持 `snell://` 前缀及 PSK、版本、混淆模式/主机名字段；`reuse`、`client-fingerprint`、ShadowTLS 密码和版本等 Mihomo 扩展参数暂未纳入
+
 ## CPU 优化回归 2026-07-11
 
 - 状态：已完成
