@@ -212,7 +212,7 @@ function SortTableHead() {
 }
 
 function EnabledTableHead() {
-  return <TableHead className="w-[5rem] text-center">开关</TableHead>;
+  return <TableHead className="w-[5rem] text-center">启用</TableHead>;
 }
 
 function DragHandle({ label, index, disabled, onDragStart, onDragEnd }) {
@@ -516,9 +516,9 @@ export function SubscriptionEditor({ subscriptions, onChange }) {
           <TableHeader>
             <TableRow>
               <SortTableHead />
-              <EnabledTableHead />
               <TableHead>订阅地址</TableHead>
               <TableHead className="w-[14rem]">备注</TableHead>
+              <EnabledTableHead />
               <TableHead className="w-[5rem] text-center">操作</TableHead>
             </TableRow>
           </TableHeader>
@@ -535,13 +535,6 @@ export function SubscriptionEditor({ subscriptions, onChange }) {
                 onDrop={dropRow}
                 onDragEnd={endRowDrag}
               >
-                <TableCell className="text-center">
-                  <CompactSwitch
-                    label={`启用订阅第 ${index + 1} 行`}
-                    checked={item.enabled !== false}
-                    onCheckedChange={(checked) => updateRow(index, { enabled: checked })}
-                  />
-                </TableCell>
                 <TableCell>
                   <TableTextInput
                     value={item.url}
@@ -556,6 +549,13 @@ export function SubscriptionEditor({ subscriptions, onChange }) {
                     aria-label="备注"
                     placeholder="可选，仅用于管理记录"
                     onChange={(event) => updateRow(index, { remark: event.target.value })}
+                  />
+                </TableCell>
+                <TableCell className="text-center">
+                  <CompactSwitch
+                    label={`启用订阅第 ${index + 1} 行`}
+                    checked={item.enabled !== false}
+                    onCheckedChange={(checked) => updateRow(index, { enabled: checked })}
                   />
                 </TableCell>
                 <TableCell className="text-center">
@@ -603,12 +603,12 @@ export function RuleProviderEditor({ providers, onChange }) {
           <TableHeader>
             <TableRow>
               <SortTableHead />
-              <EnabledTableHead />
               <TableHead>名称</TableHead>
               <TableHead>策略组</TableHead>
               <TableHead>行为</TableHead>
               <TableHead>URL</TableHead>
               <TableHead className="w-[5rem] text-center">置顶</TableHead>
+              <EnabledTableHead />
               <TableHead className="w-[5rem] text-center">操作</TableHead>
             </TableRow>
           </TableHeader>
@@ -625,13 +625,6 @@ export function RuleProviderEditor({ providers, onChange }) {
                 onDrop={dropRow}
                 onDragEnd={endRowDrag}
               >
-                <TableCell className="text-center">
-                  <CompactSwitch
-                    label={`启用 Rule Provider 第 ${index + 1} 行`}
-                    checked={item.enabled !== false}
-                    onCheckedChange={(checked) => updateRow(index, { enabled: checked })}
-                  />
-                </TableCell>
                 <TableCell>
                   <TableTextInput
                     value={item.name}
@@ -667,6 +660,13 @@ export function RuleProviderEditor({ providers, onChange }) {
                     label="插入到规则前部"
                     checked={Boolean(item.prepend)}
                     onCheckedChange={(checked) => updateRow(index, { prepend: checked })}
+                  />
+                </TableCell>
+                <TableCell className="text-center">
+                  <CompactSwitch
+                    label={`启用 Rule Provider 第 ${index + 1} 行`}
+                    checked={item.enabled !== false}
+                    onCheckedChange={(checked) => updateRow(index, { enabled: checked })}
                   />
                 </TableCell>
                 <TableCell className="text-center">
@@ -714,9 +714,9 @@ export function RulesEditor({ rules, onChange }) {
           <TableHeader>
             <TableRow>
               <SortTableHead />
-              <EnabledTableHead />
               <TableHead>规则</TableHead>
               <TableHead className="w-[5rem] text-center">置顶</TableHead>
+              <EnabledTableHead />
               <TableHead className="w-[5rem] text-center">操作</TableHead>
             </TableRow>
           </TableHeader>
@@ -733,13 +733,6 @@ export function RulesEditor({ rules, onChange }) {
                 onDrop={dropRow}
                 onDragEnd={endRowDrag}
               >
-                <TableCell className="text-center">
-                  <CompactSwitch
-                    label={`启用规则第 ${index + 1} 行`}
-                    checked={item.enabled !== false}
-                    onCheckedChange={(checked) => updateRow(index, { enabled: checked })}
-                  />
-                </TableCell>
                 <TableCell>
                   <TableTextInput
                     value={item.value}
@@ -753,6 +746,13 @@ export function RulesEditor({ rules, onChange }) {
                     label="置顶"
                     checked={Boolean(item.prepend)}
                     onCheckedChange={(checked) => updateRow(index, { prepend: checked })}
+                  />
+                </TableCell>
+                <TableCell className="text-center">
+                  <CompactSwitch
+                    label={`启用规则第 ${index + 1} 行`}
+                    checked={item.enabled !== false}
+                    onCheckedChange={(checked) => updateRow(index, { enabled: checked })}
                   />
                 </TableCell>
                 <TableCell className="text-center">
@@ -800,9 +800,9 @@ export function ReplacementEditor({ replacements, onChange }) {
           <TableHeader>
             <TableRow>
               <SortTableHead />
-              <EnabledTableHead />
               <TableHead>匹配正则</TableHead>
               <TableHead>替换文本</TableHead>
+              <EnabledTableHead />
               <TableHead className="w-[5rem] text-center">操作</TableHead>
             </TableRow>
           </TableHeader>
@@ -819,13 +819,6 @@ export function ReplacementEditor({ replacements, onChange }) {
                 onDrop={dropRow}
                 onDragEnd={endRowDrag}
               >
-                <TableCell className="text-center">
-                  <CompactSwitch
-                    label={`启用替换规则第 ${index + 1} 行`}
-                    checked={item.enabled !== false}
-                    onCheckedChange={(checked) => updateRow(index, { enabled: checked })}
-                  />
-                </TableCell>
                 <TableCell>
                   <TableTextInput
                     value={item.pattern}
@@ -840,6 +833,13 @@ export function ReplacementEditor({ replacements, onChange }) {
                     aria-label="替换文本"
                     placeholder="Hong Kong"
                     onChange={(event) => updateRow(index, { replacement: event.target.value })}
+                  />
+                </TableCell>
+                <TableCell className="text-center">
+                  <CompactSwitch
+                    label={`启用替换规则第 ${index + 1} 行`}
+                    checked={item.enabled !== false}
+                    onCheckedChange={(checked) => updateRow(index, { enabled: checked })}
                   />
                 </TableCell>
                 <TableCell className="text-center">

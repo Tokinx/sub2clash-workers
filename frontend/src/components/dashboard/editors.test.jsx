@@ -95,9 +95,10 @@ describe("dashboard table editors", () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
 
-    render(<Editor {...{ [propName]: items, onChange }} />);
+    const { container } = render(<Editor {...{ [propName]: items, onChange }} />);
 
-    expect(screen.getByText("开关")).toBeInTheDocument();
+    const headers = [...container.querySelectorAll("th")].map((header) => header.textContent.trim());
+    expect(headers.slice(-2)).toEqual(["启用", "操作"]);
     const toggle = screen.getByRole("switch", { name: label });
     expect(toggle).toBeChecked();
 
