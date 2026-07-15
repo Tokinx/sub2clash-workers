@@ -104,6 +104,55 @@ describe("renderConfig", () => {
     expect(result.stats.proxyCount).toBe(2);
   });
 
+  it("关闭的表格行会保留在配置中但在执行时全部跳过", async () => {
+    const env = createEnv({ MAX_SUBSCRIPTION_COUNT: "1" });
+    const result = await renderConfig(
+      env,
+      new Request("https://app.example.com/"),
+      createConfig({
+        sources: {
+          subscriptions: Array.from({ length: 11 }, (_, index) => ({
+            enabled: false,
+            url: `https://disabled.example.com/${index}`,
+            remark: "已关闭"
+          })),
+          nodes: ["ss://YWVzLTI1Ni1nY206cGFzc0BleGFtcGxlLmNvbTo4NDQz#原始节点"]
+        },
+        routing: {
+          ruleProviders: [
+            {
+              enabled: false,
+              name: "关闭 Provider",
+              behavior: "domain",
+              url: "https://rules.example.com/disabled.yaml",
+              group: "节点选择",
+              prepend: false
+            }
+          ],
+          rules: [
+            {
+              enabled: false,
+              value: "DOMAIN-SUFFIX,disabled.example,DIRECT",
+              prepend: false
+            }
+          ]
+        },
+        transforms: {
+          filterRegex: "",
+          replacements: [
+            { enabled: false, pattern: "[", replacement: "非法正则不会执行" },
+            { enabled: true, pattern: "原始", replacement: "启用" }
+          ]
+        }
+      })
+    );
+
+    expect(subscriptionCache.fetchSubscription).not.toHaveBeenCalled();
+    expect(result.yaml).toContain("启用节点");
+    expect(result.yaml).not.toContain("关闭 Provider");
+    expect(result.yaml).not.toContain("DOMAIN-SUFFIX,disabled.example,DIRECT");
+  });
+
   it("规则增强通过内部覆写生成 provider 和规则，并保持 MATCH 兜底在最后", async () => {
     const env = createEnv();
     const result = await renderConfig(

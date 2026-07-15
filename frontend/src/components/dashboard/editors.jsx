@@ -17,23 +17,23 @@ export const RULE_PROVIDER_BEHAVIOR_OPTIONS = [
 ];
 
 export function createEmptyReplacement() {
-  return { pattern: "", replacement: "" };
+  return { enabled: true, pattern: "", replacement: "" };
 }
 
 export function createEmptyRuleProvider() {
-  return { name: "", group: "", behavior: "", url: "", prepend: false };
+  return { enabled: true, name: "", group: "", behavior: "", url: "", prepend: false };
 }
 
 export function createEmptyRule() {
-  return { value: "", prepend: false };
+  return { enabled: true, value: "", prepend: false };
 }
 
 export function createEmptySubscription() {
-  return { url: "", remark: "" };
+  return { enabled: true, url: "", remark: "" };
 }
 
 export function cleanSubscriptions(items) {
-  return items.filter((item) => item.url.trim());
+  return items.filter((item) => item?.enabled === false || String(item?.url || "").trim());
 }
 
 export function normalizeNodes(text) {
@@ -209,6 +209,10 @@ function SortTableHead() {
       <span className="sr-only">排序</span>
     </TableHead>
   );
+}
+
+function EnabledTableHead() {
+  return <TableHead className="w-[5rem] text-center">开关</TableHead>;
 }
 
 function DragHandle({ label, index, disabled, onDragStart, onDragEnd }) {
@@ -507,11 +511,12 @@ export function SubscriptionEditor({ subscriptions, onChange }) {
 
   return (
     <div>
-      <TableFrame minWidthClassName="min-w-[45rem]">
+      <TableFrame minWidthClassName="min-w-[50rem]">
         <Table>
           <TableHeader>
             <TableRow>
               <SortTableHead />
+              <EnabledTableHead />
               <TableHead>订阅地址</TableHead>
               <TableHead className="w-[14rem]">备注</TableHead>
               <TableHead className="w-[5rem] text-center">操作</TableHead>
@@ -530,6 +535,13 @@ export function SubscriptionEditor({ subscriptions, onChange }) {
                 onDrop={dropRow}
                 onDragEnd={endRowDrag}
               >
+                <TableCell className="text-center">
+                  <CompactSwitch
+                    label={`启用订阅第 ${index + 1} 行`}
+                    checked={item.enabled !== false}
+                    onCheckedChange={(checked) => updateRow(index, { enabled: checked })}
+                  />
+                </TableCell>
                 <TableCell>
                   <TableTextInput
                     value={item.url}
@@ -586,11 +598,12 @@ export function RuleProviderEditor({ providers, onChange }) {
 
   return (
     <div>
-      <TableFrame minWidthClassName="min-w-[67rem]">
+      <TableFrame minWidthClassName="min-w-[72rem]">
         <Table>
           <TableHeader>
             <TableRow>
               <SortTableHead />
+              <EnabledTableHead />
               <TableHead>名称</TableHead>
               <TableHead>策略组</TableHead>
               <TableHead>行为</TableHead>
@@ -612,6 +625,13 @@ export function RuleProviderEditor({ providers, onChange }) {
                 onDrop={dropRow}
                 onDragEnd={endRowDrag}
               >
+                <TableCell className="text-center">
+                  <CompactSwitch
+                    label={`启用 Rule Provider 第 ${index + 1} 行`}
+                    checked={item.enabled !== false}
+                    onCheckedChange={(checked) => updateRow(index, { enabled: checked })}
+                  />
+                </TableCell>
                 <TableCell>
                   <TableTextInput
                     value={item.name}
@@ -689,11 +709,12 @@ export function RulesEditor({ rules, onChange }) {
 
   return (
     <div>
-      <TableFrame minWidthClassName="min-w-[43rem]">
+      <TableFrame minWidthClassName="min-w-[48rem]">
         <Table>
           <TableHeader>
             <TableRow>
               <SortTableHead />
+              <EnabledTableHead />
               <TableHead>规则</TableHead>
               <TableHead className="w-[5rem] text-center">置顶</TableHead>
               <TableHead className="w-[5rem] text-center">操作</TableHead>
@@ -712,6 +733,13 @@ export function RulesEditor({ rules, onChange }) {
                 onDrop={dropRow}
                 onDragEnd={endRowDrag}
               >
+                <TableCell className="text-center">
+                  <CompactSwitch
+                    label={`启用规则第 ${index + 1} 行`}
+                    checked={item.enabled !== false}
+                    onCheckedChange={(checked) => updateRow(index, { enabled: checked })}
+                  />
+                </TableCell>
                 <TableCell>
                   <TableTextInput
                     value={item.value}
@@ -767,11 +795,12 @@ export function ReplacementEditor({ replacements, onChange }) {
 
   return (
     <div>
-      <TableFrame minWidthClassName="min-w-[45rem]">
+      <TableFrame minWidthClassName="min-w-[50rem]">
         <Table>
           <TableHeader>
             <TableRow>
               <SortTableHead />
+              <EnabledTableHead />
               <TableHead>匹配正则</TableHead>
               <TableHead>替换文本</TableHead>
               <TableHead className="w-[5rem] text-center">操作</TableHead>
@@ -790,6 +819,13 @@ export function ReplacementEditor({ replacements, onChange }) {
                 onDrop={dropRow}
                 onDragEnd={endRowDrag}
               >
+                <TableCell className="text-center">
+                  <CompactSwitch
+                    label={`启用替换规则第 ${index + 1} 行`}
+                    checked={item.enabled !== false}
+                    onCheckedChange={(checked) => updateRow(index, { enabled: checked })}
+                  />
+                </TableCell>
                 <TableCell>
                   <TableTextInput
                     value={item.pattern}

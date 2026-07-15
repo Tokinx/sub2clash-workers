@@ -36,7 +36,7 @@ export function createEmptyConfig() {
   return {
     target: "meta",
     sources: {
-      subscriptions: [{ url: "", remark: "" }],
+      subscriptions: [{ enabled: true, url: "", remark: "" }],
       nodes: []
     },
     template: {
@@ -79,6 +79,7 @@ export function normalizeConfig(config = {}) {
 
   const normalizedSubscriptions = Array.isArray(config.sources?.subscriptions)
     ? config.sources.subscriptions.map((item) => ({
+        enabled: item?.enabled !== false,
         url: typeof item?.url === "string" ? item.url : "",
         remark:
           typeof item?.remark === "string"
@@ -88,6 +89,33 @@ export function normalizeConfig(config = {}) {
               : ""
       }))
     : fallback.sources.subscriptions;
+
+  const normalizedRuleProviders = Array.isArray(config.routing?.ruleProviders)
+    ? config.routing.ruleProviders.map((item) => ({
+        enabled: item?.enabled !== false,
+        name: typeof item?.name === "string" ? item.name : "",
+        group: typeof item?.group === "string" ? item.group : "",
+        behavior: typeof item?.behavior === "string" ? item.behavior : "",
+        url: typeof item?.url === "string" ? item.url : "",
+        prepend: item?.prepend === true
+      }))
+    : fallback.routing.ruleProviders;
+
+  const normalizedRules = Array.isArray(config.routing?.rules)
+    ? config.routing.rules.map((item) => ({
+        enabled: item?.enabled !== false,
+        value: typeof item?.value === "string" ? item.value : "",
+        prepend: item?.prepend === true
+      }))
+    : fallback.routing.rules;
+
+  const normalizedReplacements = Array.isArray(config.transforms?.replacements)
+    ? config.transforms.replacements.map((item) => ({
+        enabled: item?.enabled !== false,
+        pattern: typeof item?.pattern === "string" ? item.pattern : "",
+        replacement: typeof item?.replacement === "string" ? item.replacement : ""
+      }))
+    : fallback.transforms.replacements;
 
   return {
     ...fallback,
@@ -105,17 +133,13 @@ export function normalizeConfig(config = {}) {
     routing: {
       ...fallback.routing,
       ...(config.routing || {}),
-      ruleProviders: Array.isArray(config.routing?.ruleProviders)
-        ? config.routing.ruleProviders
-        : fallback.routing.ruleProviders,
-      rules: Array.isArray(config.routing?.rules) ? config.routing.rules : fallback.routing.rules
+      ruleProviders: normalizedRuleProviders,
+      rules: normalizedRules
     },
     transforms: {
       ...fallback.transforms,
       ...(config.transforms || {}),
-      replacements: Array.isArray(config.transforms?.replacements)
-        ? config.transforms.replacements
-        : fallback.transforms.replacements
+      replacements: normalizedReplacements
     },
     override: {
       ...fallback.override,

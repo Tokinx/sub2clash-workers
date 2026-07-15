@@ -134,3 +134,10 @@
 - 仅在 `Clash.Meta / Mihomo` 目标下保留 `snell` 节点，`Clash` 目标继续过滤
 - 支持 `snell://psk@server:port` 及 `version`、`obfs`、`obfs-host` 参数，并补充解析与渲染回归
 - 状态：已完成
+
+## Phase 21
+
+- 为订阅源、Rule Provider、自定义规则和节点名替换表格增加行级 `enabled` 开关
+- 新增行默认开启，历史配置缺少 `enabled` 时兼容为开启
+- 关闭行继续保留在配置中，但不参与校验后的执行、订阅源数量限制、订阅抓取、规则增强和节点名替换
+- 状态：已完成

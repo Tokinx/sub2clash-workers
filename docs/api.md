@@ -22,6 +22,11 @@
 ### `config` 关键字段
 
 - `sources.subscriptions[].remark`：订阅源备注，仅用于管理台记录，不参与节点名渲染
+- `sources.subscriptions[].enabled`：订阅源行开关；默认 `true`，为 `false` 时不抓取且不计入订阅源数量限制
+- `routing.ruleProviders[].enabled`：Rule Provider 行开关；默认 `true`，为 `false` 时不生成 provider 与对应 `RULE-SET`
+- `routing.rules[].enabled`：自定义规则行开关；默认 `true`，为 `false` 时不写入最终规则
+- `transforms.replacements[].enabled`：节点名替换行开关；默认 `true`，为 `false` 时不执行对应正则替换
+- 以上行级开关只有显式布尔值 `false` 才会关闭；旧配置未提供 `enabled` 时继续按开启处理，关闭行仍保留在配置 payload 中
 - `override.type`：当前仅支持 `yaml`
 - `override.content`：YAML 覆写文本，随 `/api/render`、短链配置和长链接 payload 一起传递
 - `override.content` 同时支持基础 merge 语法和项目自定义的 `$patches` / `$select` 扩展

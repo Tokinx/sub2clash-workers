@@ -32,6 +32,8 @@
 - `snell` 仅参与 `Clash.Meta / Mihomo` 渲染；当目标为 `clash` 时会按既有支持矩阵直接过滤
 - `snell` 分享链接采用 `snell://psk@server:port?version=1&obfs=http&obfs-host=example.com#name` 形式；`version` 支持 1 至 5，缺省为 1，`obfs` 支持 `http`、`tls`、`shadow-tls`
 - 订阅源字段统一使用 `sources.subscriptions[].remark` 保存备注，仅作为管理台辅助信息，不参与订阅渲染与节点改名
+- 订阅源、Rule Provider、自定义规则和节点名替换统一使用行级 `enabled` 字段；只有显式 `false` 表示关闭，历史配置缺少该字段时按开启兼容
+- 关闭行继续随长链接、短链和管理台配置保存，但域层不会抓取关闭的订阅源，也不会应用关闭的 Rule Provider、规则或替换项；关闭行不计入订阅源执行数量限制
 - `options.autoFlag` 作为单份配置的一部分参与长链接、短链接与实时预览；渲染层在节点过滤、替换、名称去重之后补齐旗帜，再生成国家组
 - 自动旗帜仅基于内置国家/地区识别规则处理节点名；若节点名已包含 emoji 旗帜或无法识别对应国家/地区，则保持原名
 - `config.override` 作为单份配置的一部分参与长链接、短链接与实时预览，不新增独立 KV key

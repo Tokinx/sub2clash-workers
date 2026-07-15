@@ -39,7 +39,8 @@ function assertProxyCount(count, limit) {
 }
 
 function assertWorkloadConfig(config, limits) {
-  if (config.sources.subscriptions.length > limits.maxSubscriptionCount) {
+  const enabledSubscriptionCount = config.sources.subscriptions.filter((item) => item.enabled).length;
+  if (enabledSubscriptionCount > limits.maxSubscriptionCount) {
     throw badRequest(`订阅源数量不能超过 ${limits.maxSubscriptionCount}`);
   }
   assertProxyCount(config.sources.nodes.length, limits.maxProxyCount);
@@ -206,7 +207,7 @@ function applyFilterAndReplace(proxies, config) {
     next = next.filter((proxy) => !regex.test(proxy.name));
   }
 
-  for (const replacement of config.transforms.replacements) {
+  for (const replacement of config.transforms.replacements.filter((item) => item.enabled)) {
     let regex;
     try {
       regex = new RegExp(replacement.pattern, "g");
@@ -340,7 +341,7 @@ function createRuleProviderConfig(provider) {
 }
 
 function hasRoutingEnhancements(routing) {
-  return routing.ruleProviders.length > 0 || routing.rules.length > 0;
+  return routing.ruleProviders.some((item) => item.enabled) || routing.rules.some((item) => item.enabled);
 }
 
 function escapeOverrideKey(key) {
@@ -361,10 +362,12 @@ function buildRoutingOverride(baseConfig, routing) {
   }
 
   const override = {};
-  const prependRules = routing.rules.filter((rule) => rule.prepend).map((rule) => rule.value);
-  const appendRules = routing.rules.filter((rule) => !rule.prepend).map((rule) => rule.value);
-  const prependProviders = routing.ruleProviders.filter((item) => item.prepend);
-  const appendProviders = routing.ruleProviders.filter((item) => !item.prepend);
+  const enabledRules = routing.rules.filter((item) => item.enabled);
+  const enabledProviders = routing.ruleProviders.filter((item) => item.enabled);
+  const prependRules = enabledRules.filter((rule) => rule.prepend).map((rule) => rule.value);
+  const appendRules = enabledRules.filter((rule) => !rule.prepend).map((rule) => rule.value);
+  const prependProviders = enabledProviders.filter((item) => item.prepend);
+  const appendProviders = enabledProviders.filter((item) => !item.prepend);
 
   let rules = appendRulesKeepingMatchLast(
     [...prependRules, ...(Array.isArray(baseConfig.rules) ? baseConfig.rules : [])],
@@ -383,7 +386,7 @@ function buildRoutingOverride(baseConfig, routing) {
 
   override["rules!"] = rules;
 
-  if (routing.ruleProviders.length > 0) {
+  if (enabledProviders.length > 0) {
     override["rule-providers"] = Object.fromEntries(
       [...prependProviders, ...appendProviders].map((provider) => [
         replaceOverrideKey(provider.name),
@@ -438,9 +441,10 @@ function mergeTemplate(templateContent, proxies, countryGroups, config) {
 async function collectRemoteProxies(env, request, config, context, limits) {
   const result = [];
   let subscriptionUserinfo = "";
+  const subscriptions = config.sources.subscriptions.filter((item) => item.enabled);
 
-  for (let index = 0; index < config.sources.subscriptions.length; index += 1) {
-    const subscription = config.sources.subscriptions[index];
+  for (let index = 0; index < subscriptions.length; index += 1) {
+    const subscription = subscriptions[index];
     const hash = await sha256Hex(subscription.url);
 
     let payload;
@@ -470,7 +474,7 @@ async function collectRemoteProxies(env, request, config, context, limits) {
     assertProxyCount(proxies.length, remaining);
     result.push(...proxies);
 
-    if (index === 0 && config.sources.subscriptions.length === 1) {
+    if (index === 0 && subscriptions.length === 1) {
       subscriptionUserinfo = payload.subscriptionUserinfo || "";
     }
   }

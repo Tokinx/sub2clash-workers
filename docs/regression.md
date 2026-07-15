@@ -1,5 +1,28 @@
 # 回归记录
 
+## 表格行级开关回归 2026-07-15
+
+- 状态：已完成
+- 目标：为订阅源、Rule Provider、自定义规则和节点名替换表格增加默认开启的行级开关，关闭后执行链路自动跳过对应行
+- 变更：
+  - 四类表格统一新增“开关”列，新建行显式写入 `enabled: true`
+  - 前后端配置归一化以“仅显式 `false` 表示关闭”为兼容规则，历史长链接、短链和 KV 配置缺少字段时继续按开启处理
+  - 关闭行继续保留在配置 payload 中，可保存不完整内容；渲染时不会抓取关闭的订阅源，也不会应用关闭的 Provider、规则或替换项
+  - 订阅源数量限制只统计开启行，关闭的非法替换正则不会进入执行阶段，`nodeList` warning 也只判断开启的规则增强
+- 测试：
+  - `bun run test:worker -- tests/unit/config.test.js tests/unit/render.test.js`
+  - `bun run test:frontend -- src/lib/config.test.js src/components/dashboard/editors.test.jsx`
+  - `bun run test`
+  - `bun run build:frontend`
+  - `git diff --check`
+- 结果：
+  - Worker 定向回归：2 个测试文件、26 个用例通过
+  - 前端定向回归：2 个测试文件、15 个用例通过
+  - 完整回归：Worker 侧 6 个测试文件、66 个用例通过；前端 7 个测试文件、23 个用例通过
+  - 前端生产构建成功，差异格式检查通过
+- 现存风险：
+  - 单节点文本输入与全局过滤正则不是表格行，本次不增加行级开关，继续沿用原有启用语义
+
 ## Snell 连接字符串回归 2026-07-11
 
 - 状态：已完成

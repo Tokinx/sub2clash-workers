@@ -18,6 +18,10 @@ function ensureArray(value) {
   return Array.isArray(value) ? value : [];
 }
 
+function isRowEnabled(item) {
+  return item?.enabled !== false;
+}
+
 export function validateAndNormalizeConfig(input) {
   if (!input || typeof input !== "object") {
     throw badRequest("配置格式错误");
@@ -29,20 +33,34 @@ export function validateAndNormalizeConfig(input) {
   }
 
   const subscriptions = ensureArray(input.sources?.subscriptions).map((item) => {
-    if (!item || typeof item !== "object" || !item.url) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
       throw badRequest("订阅地址格式错误");
     }
-    let url;
-    try {
-      url = new URL(item.url);
-    } catch {
-      throw badRequest("订阅地址格式错误");
+
+    const enabled = isRowEnabled(item);
+    const rawUrl = typeof item.url === "string" ? item.url.trim() : "";
+    let normalizedUrl = rawUrl;
+
+    if (enabled) {
+      if (!rawUrl) {
+        throw badRequest("订阅地址格式错误");
+      }
+
+      let url;
+      try {
+        url = new URL(rawUrl);
+      } catch {
+        throw badRequest("订阅地址格式错误");
+      }
+      if (!["http:", "https:"].includes(url.protocol)) {
+        throw badRequest("订阅地址仅支持 http/https");
+      }
+      normalizedUrl = url.toString();
     }
-    if (!["http:", "https:"].includes(url.protocol)) {
-      throw badRequest("订阅地址仅支持 http/https");
-    }
+
     return {
-      url: url.toString(),
+      enabled,
+      url: normalizedUrl,
       remark:
         typeof item.remark === "string"
           ? item.remark.trim()
@@ -56,7 +74,7 @@ export function validateAndNormalizeConfig(input) {
     .map((item) => String(item || "").trim())
     .filter(Boolean);
 
-  if (subscriptions.length === 0 && nodes.length === 0) {
+  if (subscriptions.every((item) => !item.enabled) && nodes.length === 0) {
     throw badRequest("subscriptions 和 nodes 不能同时为空");
   }
 
@@ -66,20 +84,28 @@ export function validateAndNormalizeConfig(input) {
   }
 
   const ruleProviders = ensureArray(input.routing?.ruleProviders).map((provider) => {
-    if (!provider?.name || !provider?.url || !provider?.group) {
+    if (!provider || typeof provider !== "object" || Array.isArray(provider)) {
       throw badRequest("rule provider 配置不完整");
     }
-    return {
-      name: String(provider.name).trim(),
+
+    const normalized = {
+      enabled: isRowEnabled(provider),
+      name: String(provider.name ?? "").trim(),
       behavior: String(provider.behavior || "domain").trim(),
-      url: String(provider.url).trim(),
-      group: String(provider.group).trim(),
+      url: String(provider.url ?? "").trim(),
+      group: String(provider.group ?? "").trim(),
       prepend: Boolean(provider.prepend)
     };
+
+    if (normalized.enabled && (!normalized.name || !normalized.url || !normalized.group)) {
+      throw badRequest("rule provider 配置不完整");
+    }
+
+    return normalized;
   });
 
   const names = new Set();
-  for (const provider of ruleProviders) {
+  for (const provider of ruleProviders.filter((item) => item.enabled)) {
     if (names.has(provider.name)) {
       throw badRequest("rule provider 名称不能重复");
     }
@@ -87,23 +113,39 @@ export function validateAndNormalizeConfig(input) {
   }
 
   const rules = ensureArray(input.routing?.rules).map((rule) => {
-    if (!rule?.value) {
+    if (!rule || typeof rule !== "object" || Array.isArray(rule)) {
       throw badRequest("规则内容不能为空");
     }
-    return {
-      value: String(rule.value).trim(),
+
+    const normalized = {
+      enabled: isRowEnabled(rule),
+      value: String(rule.value ?? "").trim(),
       prepend: Boolean(rule.prepend)
     };
+
+    if (normalized.enabled && !normalized.value) {
+      throw badRequest("规则内容不能为空");
+    }
+
+    return normalized;
   });
 
   const replacements = ensureArray(input.transforms?.replacements).map((item) => {
-    if (!item?.pattern) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
       throw badRequest("替换规则 pattern 不能为空");
     }
-    return {
-      pattern: String(item.pattern),
+
+    const normalized = {
+      enabled: isRowEnabled(item),
+      pattern: String(item.pattern ?? ""),
       replacement: String(item.replacement || "")
     };
+
+    if (normalized.enabled && !normalized.pattern) {
+      throw badRequest("替换规则 pattern 不能为空");
+    }
+
+    return normalized;
   });
 
   const options = {
