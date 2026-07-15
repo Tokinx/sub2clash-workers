@@ -24,12 +24,16 @@ export async function fetchTextWithRetry(url, options = {}) {
     const timer = setTimeout(() => controller.abort("timeout"), timeoutMs);
 
     try {
-      const response = await fetch(target.toString(), {
+      const fetchOptions = {
         headers,
         redirect: "follow",
-        signal: controller.signal,
-        cache: noStore ? "no-store" : "default"
-      });
+        signal: controller.signal
+      };
+      if (noStore) {
+        fetchOptions.cache = "no-store";
+      }
+
+      const response = await fetch(target.toString(), fetchOptions);
 
       if (!response.ok) {
         throw unprocessable(`远程请求失败: ${response.status}`);
