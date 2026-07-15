@@ -68,6 +68,7 @@ export default function DashboardPage({ templates }) {
   const [savedLinks, setSavedLinks] = useState([]);
   const [savedLinksLoading, setSavedLinksLoading] = useState(false);
   const [shortLinkId, setShortLinkId] = useState("");
+  const [shortLinkRemark, setShortLinkRemark] = useState("");
   const [subscriptionInfo, setSubscriptionInfo] = useState("");
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -172,6 +173,7 @@ export default function DashboardPage({ templates }) {
   function upsertSavedLink(link) {
     const summary = {
       id: link.id,
+      remark: link.remark || "",
       createdAt: link.createdAt,
       updatedAt: link.updatedAt,
     };
@@ -256,6 +258,7 @@ export default function DashboardPage({ templates }) {
         setConfig(nextConfig);
         setNodesText((nextConfig.sources?.nodes || []).join("\n"));
         setShortLinkId("");
+        setShortLinkRemark("");
         showSuccess("已解析长链接配置");
         return;
       }
@@ -267,6 +270,7 @@ export default function DashboardPage({ templates }) {
         setConfig(nextConfig);
         setNodesText((nextConfig.sources?.nodes || []).join("\n"));
         setShortLinkId(data.id);
+        setShortLinkRemark(data.remark || "");
         showSuccess("已导入短链接配置");
         return;
       }
@@ -283,9 +287,11 @@ export default function DashboardPage({ templates }) {
         method: "POST",
         body: JSON.stringify({
           config: effectiveConfig,
+          remark: shortLinkRemark,
         }),
       });
       setShortLinkId(data.id);
+      setShortLinkRemark(data.remark || "");
       upsertSavedLink(data);
       showSuccess("短链接已生成");
     } catch (error) {
@@ -301,8 +307,9 @@ export default function DashboardPage({ templates }) {
     try {
       const link = await apiFetch(`/api/links/${shortLinkId}`, {
         method: "PUT",
-        body: JSON.stringify({ config: effectiveConfig }),
+        body: JSON.stringify({ config: effectiveConfig, remark: shortLinkRemark }),
       });
+      setShortLinkRemark(link.remark || "");
       upsertSavedLink(link);
       showSuccess("短链接已更新");
     } catch (error) {
@@ -322,6 +329,7 @@ export default function DashboardPage({ templates }) {
       });
       setSavedLinks((current) => current.filter((item) => item.id !== shortLinkId));
       setShortLinkId("");
+      setShortLinkRemark("");
       showSuccess("短链接已删除");
     } catch (error) {
       showError(error.message || "删除短链接失败。");
@@ -724,6 +732,16 @@ export default function DashboardPage({ templates }) {
             {!canCopyLongLink ? (
               <p className="mt-3 text-sm text-[var(--error)]">长链接接近 Workers URL 限制，建议生成短链接。</p>
             ) : null}
+
+            <Field label="短链备注（可选）" htmlFor="short-link-remark" className="mt-5">
+              <Input
+                id="short-link-remark"
+                value={shortLinkRemark}
+                maxLength={100}
+                placeholder="例如：手机端主订阅"
+                onChange={(event) => setShortLinkRemark(event.target.value)}
+              />
+            </Field>
 
             {shortLinkId ? (
               <div className="mt-5 border-t border-border pt-5">

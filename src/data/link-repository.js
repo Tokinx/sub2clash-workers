@@ -8,9 +8,27 @@ function validateId(id) {
   }
 }
 
+function normalizeLinkRemark(remark) {
+  if (remark === undefined || remark === null) {
+    return "";
+  }
+
+  if (typeof remark !== "string") {
+    throw badRequest("短链备注格式无效");
+  }
+
+  const normalized = remark.trim();
+  if (Array.from(normalized).length > 100) {
+    throw badRequest("短链备注不能超过 100 个字符");
+  }
+
+  return normalized;
+}
+
 function buildLinkSummary(record) {
   return {
     id: record.id,
+    remark: typeof record.remark === "string" ? record.remark : "",
     createdAt: record.createdAt,
     updatedAt: record.updatedAt
   };
@@ -22,7 +40,7 @@ async function putLinkRecord(env, record) {
   });
 }
 
-export async function createLink(env, config) {
+export async function createLink(env, config, remark) {
   const id = randomId(20);
   validateId(id);
   const key = buildLinkKey(id);
@@ -34,6 +52,7 @@ export async function createLink(env, config) {
   const now = new Date().toISOString();
   const record = {
     id,
+    remark: normalizeLinkRemark(remark),
     config,
     createdAt: now,
     updatedAt: now
@@ -47,7 +66,7 @@ export async function listLinks(env) {
   const records = await Promise.all(
     listed.keys.map(async (item) => {
       if (item.metadata?.id && item.metadata?.createdAt && item.metadata?.updatedAt) {
-        return item.metadata;
+        return buildLinkSummary(item.metadata);
       }
 
       const record = await env.CACHE.get(item.name, "json");
@@ -66,13 +85,17 @@ export async function getLink(env, id) {
   if (!record) {
     throw notFound("短链不存在");
   }
-  return record;
+  return {
+    ...record,
+    remark: typeof record.remark === "string" ? record.remark : ""
+  };
 }
 
-export async function updateLink(env, id, config) {
+export async function updateLink(env, id, config, remark) {
   const record = await getLink(env, id);
   const nextRecord = {
     ...record,
+    remark: remark === undefined ? record.remark : normalizeLinkRemark(remark),
     config,
     updatedAt: new Date().toISOString()
   };

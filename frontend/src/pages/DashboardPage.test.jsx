@@ -41,11 +41,13 @@ describe("DashboardPage", () => {
         links: [
           {
             id: "saved-link-id",
+            remark: "家庭设备主订阅",
             createdAt: "2026-04-16T01:00:00.000Z",
             updatedAt: "2026-04-16T02:00:00.000Z"
           },
           {
             id: "saved-link-id-2",
+            remark: "",
             createdAt: "2026-04-16T00:00:00.000Z",
             updatedAt: "2026-04-16T01:30:00.000Z"
           }
@@ -53,10 +55,12 @@ describe("DashboardPage", () => {
       })
       .mockResolvedValueOnce({
         id: "saved-link-id",
+        remark: "家庭设备主订阅",
         config: importedShortConfig
       })
       .mockResolvedValueOnce({
         id: "short-link-id",
+        remark: "新设备订阅",
         createdAt: "2026-04-16T03:00:00.000Z",
         updatedAt: "2026-04-16T03:00:00.000Z"
       });
@@ -71,6 +75,7 @@ describe("DashboardPage", () => {
     expect(linkInput).toHaveFocus();
     const firstHistoryOption = await screen.findByText("/s/saved-link-id");
     expect(firstHistoryOption).toBeInTheDocument();
+    expect(screen.getByText(/家庭设备主订阅 · 最近更新：\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/)).toBeInTheDocument();
     expect(screen.getByText("/s/saved-link-id-2")).toBeInTheDocument();
     await user.click(await screen.findByText("/s/saved-link-id"));
     expect(linkInput).toHaveValue("/s/saved-link-id");
@@ -83,6 +88,7 @@ describe("DashboardPage", () => {
 
     expect(await screen.findByDisplayValue("vmess://node-from-short")).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: /覆写内容/i })).toHaveValue("mixed-port!: 7892\n");
+    expect(screen.getByRole("textbox", { name: /短链备注/i })).toHaveValue("家庭设备主订阅");
 
     fireEvent.change(linkInput, {
       target: { value: longLink }
@@ -94,7 +100,17 @@ describe("DashboardPage", () => {
     expect(await screen.findByDisplayValue("vmess://node-from-long")).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: /覆写内容/i })).toHaveValue("mixed-port!: 7891\n");
 
+    await user.type(screen.getByRole("textbox", { name: /短链备注/i }), "新设备订阅");
+
     await user.click(screen.getByRole("button", { name: /生成短链接/i }));
+
+    expect(apiFetch).toHaveBeenLastCalledWith(
+      "/api/links",
+      expect.objectContaining({
+        method: "POST",
+        body: expect.stringContaining('"remark":"新设备订阅"')
+      })
+    );
 
     expect(await screen.findByRole("button", { name: /复制短链接/i })).toBeInTheDocument();
 

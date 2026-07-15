@@ -43,6 +43,10 @@
 - `GET /api/links/:id`
 - `PUT /api/links/:id`
 - `DELETE /api/links/:id`
+- 短链记录包含顶层 `remark` 字段，仅用于管理台识别，不进入 `config`，也不影响 `/s/:id` 的订阅渲染
+- `POST /api/links` 请求体为 `{ config, remark }`；`PUT /api/links/:id` 请求体为 `{ config, remark }`
+- `remark` 会去除首尾空白，最多 100 个字符；创建时未提供或历史记录缺少该字段按空字符串处理，更新时未提供则保留原备注
+- `GET /api/links` 的摘要项返回 `id`、`remark`、`createdAt`、`updatedAt`
 
 ## 返回约定
 

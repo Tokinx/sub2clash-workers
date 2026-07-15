@@ -75,7 +75,7 @@ export function createApiRouter() {
 
   protectedApi.post("/links", async (c) => {
     const body = await c.req.json();
-    const link = await createLink(c.env, body.config);
+    const link = await createLink(c.env, body.config, body.remark);
     return c.json(link, 201);
   });
 
@@ -91,7 +91,7 @@ export function createApiRouter() {
 
   protectedApi.put("/links/:id", async (c) => {
     const body = await c.req.json();
-    const link = await updateLink(c.env, c.req.param("id"), body.config);
+    const link = await updateLink(c.env, c.req.param("id"), body.config, body.remark);
     return c.json(link);
   });
 

@@ -62,6 +62,7 @@ describe("worker api", () => {
         },
         body: JSON.stringify({
           customId: "manual-id",
+          remark: "  家庭设备主订阅  ",
           config: {
             target: "meta",
             sources: {
@@ -106,6 +107,7 @@ describe("worker api", () => {
     const link = await linkResponse.json();
     expect(link.id).not.toBe("manual-id");
     expect(link.id).toHaveLength(20);
+    expect(link.remark).toBe("家庭设备主订阅");
 
     const linksResponse = await app.request(
       "https://app.example.com/api/links",
@@ -120,12 +122,42 @@ describe("worker api", () => {
       expect.arrayContaining([
         expect.objectContaining({
           id: link.id,
+          remark: "家庭设备主订阅",
           createdAt: link.createdAt,
           updatedAt: link.updatedAt
         })
       ])
     );
     expect(linksData.links[0]).not.toHaveProperty("config");
+
+    const updateLinkResponse = await app.request(
+      `https://app.example.com/api/links/${link.id}`,
+      {
+        method: "PUT",
+        headers: {
+          cookie,
+          "content-type": "application/json"
+        },
+        body: JSON.stringify({ config: link.config, remark: "平板备用订阅" })
+      },
+      env
+    );
+    expect(updateLinkResponse.status).toBe(200);
+    expect((await updateLinkResponse.json()).remark).toBe("平板备用订阅");
+
+    const invalidRemarkResponse = await app.request(
+      "https://app.example.com/api/links",
+      {
+        method: "POST",
+        headers: {
+          cookie,
+          "content-type": "application/json"
+        },
+        body: JSON.stringify({ config: link.config, remark: "备".repeat(101) })
+      },
+      env
+    );
+    expect(invalidRemarkResponse.status).toBe(400);
 
     const renderApiResponse = await app.request(
       "https://app.example.com/api/render",

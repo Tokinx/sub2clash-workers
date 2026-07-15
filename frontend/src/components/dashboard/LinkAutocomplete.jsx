@@ -17,13 +17,19 @@ function formatTimestamp(value) {
     return "更新时间未知";
   }
 
-  return new Intl.DateTimeFormat("zh-CN", {
+  const parts = new Intl.DateTimeFormat("zh-CN", {
+    year: "numeric",
     month: "2-digit",
     day: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
+    second: "2-digit",
     hour12: false
-  }).format(date);
+  })
+    .formatToParts(date)
+    .reduce((result, part) => ({ ...result, [part.type]: part.value }), {});
+
+  return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}:${parts.second}`;
 }
 
 export default function LinkAutocomplete({ value, options, loading = false, placeholder, onChange }) {
@@ -88,7 +94,9 @@ export default function LinkAutocomplete({ value, options, loading = false, plac
     const rest = [];
 
     options.forEach((option) => {
-      const isMatched = [option.id, option.path, option.url].some((item) => item.toLowerCase().includes(keyword));
+      const isMatched = [option.id, option.path, option.url, option.remark].some((item) =>
+        String(item || "").toLowerCase().includes(keyword),
+      );
       if (isMatched) {
         matched.push(option);
         return;
@@ -157,7 +165,9 @@ export default function LinkAutocomplete({ value, options, loading = false, plac
                     <Link2 className="h-4 w-4 text-[var(--brand)]" />
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-mono text-[0.84rem] text-foreground">{option.path}</p>
-                      <p className="text-xs text-muted-foreground">最近更新 {formatTimestamp(option.updatedAt)}</p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {option.remark ? `${option.remark} · ` : ""}最近更新：{formatTimestamp(option.updatedAt)}
+                      </p>
                     </div>
                     {option.id === activeValue ? <Check className="h-4 w-4 text-[var(--brand)]" /> : null}
                   </CommandItem>
