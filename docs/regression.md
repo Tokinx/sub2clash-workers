@@ -1,5 +1,31 @@
 # 回归记录
 
+## 订阅源与短链 YAML 长时缓存回归 2026-07-15
+
+- 状态：已完成
+- 目标：将外部订阅缓存延长至 6 小时，为单个外部源提供手动刷新，并仅缓存短链接最终 YAML
+- 变更：
+  - `SUB_CACHE_TTL_SECONDS` 默认值调整为 21600 秒，同时控制外部订阅与短链 YAML KV 缓存
+  - 管理台订阅表格在关闭全局强制刷新时显示逐行刷新按钮；关闭行、非法地址和同域地址不可刷新
+  - 新增受会话保护的 `POST /api/subscriptions/refresh`，使用 `no-store` 更新单个外部订阅，失败时保留旧缓存
+  - `/s/:id` 在非强制刷新模式下缓存最终 YAML、统计、warning 与 `subscription-userinfo`；长链接和实时预览不缓存
+  - 新增外部源、自建模板和嵌套短链依赖索引；订阅刷新、短链更新/删除、模板更新/删除会递归失效父短链缓存
+  - 同域 `/s/:id` 与 `/sub/:payload` 继续内部解析，不再写入外部订阅缓存
+- 测试：
+  - `bun run test:worker -- tests/unit/cache.test.js tests/unit/render.test.js tests/integration/api.test.js tests/unit/http.test.js`
+  - `bun run test:frontend -- src/components/dashboard/editors.test.jsx src/pages/DashboardPage.test.jsx`
+  - `bun run test`
+  - `bun run build:frontend`
+  - `git diff --check`
+- 结果：
+  - Worker 定向回归：4 个测试文件、32 个用例通过
+  - 前端定向回归：2 个测试文件、15 个用例通过
+  - 完整回归：Worker 侧 8 个测试文件、76 个用例通过；前端 7 个测试文件、25 个用例通过
+  - 前端生产构建成功，差异格式检查通过
+- 现存风险：
+  - 依赖反向索引基于 KV 读改写，极端并发修改同一依赖集合时仍受 KV eventual consistency 影响
+  - 已生成的静态资源主包约 551 kB，Vite 继续提示单 chunk 超过 500 kB，本次缓存功能未扩大既有代码拆分范围
+
 ## Workers 订阅抓取缓存参数修复 2026-07-15
 
 - 状态：已完成

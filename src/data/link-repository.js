@@ -1,6 +1,7 @@
 import { randomId } from "../utils/crypto.js";
 import { badRequest, notFound } from "../utils/errors.js";
 import { buildLinkKey } from "./keys.js";
+import { invalidateLinkCaches, removeLinkCacheDependencies } from "./cache-dependencies.js";
 
 function validateId(id) {
   if (!/^[A-Za-z0-9_-]{4,64}$/.test(id)) {
@@ -99,11 +100,15 @@ export async function updateLink(env, id, config, remark) {
     config,
     updatedAt: new Date().toISOString()
   };
+  await invalidateLinkCaches(env, [id]);
+  await removeLinkCacheDependencies(env, id);
   await putLinkRecord(env, nextRecord);
   return nextRecord;
 }
 
 export async function deleteLink(env, id) {
   await getLink(env, id);
+  await invalidateLinkCaches(env, [id]);
+  await removeLinkCacheDependencies(env, id);
   await env.CACHE.delete(buildLinkKey(id));
 }

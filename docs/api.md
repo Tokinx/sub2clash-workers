@@ -34,7 +34,16 @@
 - 当 `options.nodeList = true` 且存在规则增强或覆写内容时，接口仍正常返回 YAML，但 `warnings` 会提示对应配置已被忽略
 - 单次配置默认最多包含 10 个订阅源，由 `MAX_SUBSCRIPTION_COUNT` 调整
 - 单次渲染默认最多处理 100 个输入节点，由 `MAX_PROXY_COUNT` 调整；远程订阅、内联节点、同域订阅及模板/覆写最终结果均受此限制
-- `options.refresh = true` 会绕过远程订阅 KV 缓存；当前不缓存最终 YAML
+- `options.refresh = true` 会绕过远程订阅和短链 YAML KV 缓存，且不写回缓存
+- `/sub/:payload` 与 `POST /api/render` 不缓存最终 YAML；`/s/:id` 在非强制刷新模式下缓存最终 YAML
+
+## 订阅缓存
+
+- `POST /api/subscriptions/refresh`
+- 接口需要管理会话，请求体为 `{ url, userAgent }`
+- `url` 必须为与当前 Worker 不同源的 HTTP/HTTPS 地址；成功后使用 `no-store` 拉取并覆盖对应订阅缓存
+- 默认缓存时间为 21600 秒，由 `SUB_CACHE_TTL_SECONDS` 调整
+- 刷新成功会递归清除直接或间接依赖该订阅的短链 YAML 缓存；刷新失败不会删除原有缓存
 
 ## 短链
 
@@ -47,6 +56,7 @@
 - `POST /api/links` 请求体为 `{ config, remark }`；`PUT /api/links/:id` 请求体为 `{ config, remark }`
 - `remark` 会去除首尾空白，最多 100 个字符；创建时未提供或历史记录缺少该字段按空字符串处理，更新时未提供则保留原备注
 - `GET /api/links` 的摘要项返回 `id`、`remark`、`createdAt`、`updatedAt`
+- 更新短链接会立即清除自身及所有父短链的 YAML 缓存，并同步依赖索引
 
 ## 返回约定
 

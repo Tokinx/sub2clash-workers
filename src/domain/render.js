@@ -1,6 +1,8 @@
 import YAML from "yaml";
 
 import { getLink } from "../data/link-repository.js";
+import { syncLinkCacheDependencies } from "../data/cache-dependencies.js";
+import { getCachedLinkOutput, putCachedLinkOutput } from "../data/link-output-cache.js";
 import { fetchSubscription, getCachedSubscription, putCachedSubscription } from "../data/subscription-cache.js";
 import { findCustomTemplate } from "../data/settings-repository.js";
 import { decodeBase64UrlText } from "../utils/base64url.js";
@@ -52,7 +54,10 @@ function createRenderContext(context) {
   }
 
   return {
-    activeLocalSubscriptionUrls: new Set()
+    activeLocalSubscriptionUrls: new Set(),
+    externalSourceHashes: new Set(),
+    childLinkIds: new Set(),
+    customTemplateIds: new Set()
   };
 }
 
@@ -142,6 +147,9 @@ async function resolveLocalSubscription(env, request, subscriptionUrl, context) 
   }
 
   const localRequest = createInternalRequest(request, localTarget.targetUrl);
+  if (localTarget.type === "short") {
+    context.childLinkIds.add(localTarget.id);
+  }
   const result =
     localTarget.type === "short"
       ? await renderLinkData(env, localRequest, localTarget.id, context)
@@ -153,7 +161,7 @@ async function resolveLocalSubscription(env, request, subscriptionUrl, context) 
   };
 }
 
-async function loadTemplate(env, request, config) {
+async function loadTemplate(env, request, config, context) {
   if (config.template.mode === "builtin") {
     return loadBuiltinTemplate(env, request, config.template.value);
   }
@@ -162,6 +170,7 @@ async function loadTemplate(env, request, config) {
   if (!template) {
     throw notFound("自建模板不存在");
   }
+  context.customTemplateIds.add(config.template.value);
   return template;
 }
 
@@ -446,20 +455,23 @@ async function collectRemoteProxies(env, request, config, context, limits) {
   for (let index = 0; index < subscriptions.length; index += 1) {
     const subscription = subscriptions[index];
     const hash = await sha256Hex(subscription.url);
+    const localTarget = resolveLocalSubscriptionTarget(request, subscription.url);
 
     let payload;
-    if (!config.options.refresh) {
+    if (localTarget) {
+      payload = await resolveLocalSubscription(env, request, subscription.url, context);
+    } else if (!config.options.refresh) {
+      context.externalSourceHashes.add(hash);
       payload = await getCachedSubscription(env, hash);
     }
 
     if (!payload) {
-      payload =
-        (await resolveLocalSubscription(env, request, subscription.url, context)) ||
-        (await fetchSubscription(env, subscription.url, {
-          userAgent: config.options.userAgent,
-          retries: 2,
-          noStore: config.options.refresh
-        }));
+      context.externalSourceHashes.add(hash);
+      payload = await fetchSubscription(env, subscription.url, {
+        userAgent: config.options.userAgent,
+        retries: 2,
+        noStore: config.options.refresh
+      });
       if (!config.options.refresh) {
         await putCachedSubscription(env, hash, payload);
       }
@@ -496,7 +508,7 @@ async function renderConfigData(env, request, inputConfig, context) {
     const config = validateAndNormalizeConfig(inputConfig);
     const limits = getWorkloadLimits(env);
     assertWorkloadConfig(config, limits);
-    const template = await loadTemplate(env, request, config);
+    const template = await loadTemplate(env, request, config, renderContext);
     const remote = await collectRemoteProxies(env, request, config, renderContext, limits);
     const inline = collectInlineProxies(config);
 
@@ -565,10 +577,31 @@ async function renderLinkData(env, request, id, context) {
 }
 
 export async function renderLink(env, request, id, context) {
-  const result = await renderLinkData(env, request, id, context);
+  const record = await getLink(env, id);
+  const shouldUseCache = record.config?.options?.refresh !== true && !context;
+  if (shouldUseCache) {
+    const cached = await getCachedLinkOutput(env, id);
+    if (cached) {
+      return cached;
+    }
+  }
+
+  const renderContext = createRenderContext(context);
+  const result = await renderConfigData(env, request, record.config, renderContext);
   const { output, ...metadata } = result;
-  return {
+  const rendered = {
     yaml: YAML.stringify(output),
     ...metadata
   };
+
+  if (shouldUseCache) {
+    await syncLinkCacheDependencies(env, id, {
+      sources: [...renderContext.externalSourceHashes],
+      templates: [...renderContext.customTemplateIds],
+      children: [...renderContext.childLinkIds]
+    });
+    await putCachedLinkOutput(env, id, rendered);
+  }
+
+  return rendered;
 }

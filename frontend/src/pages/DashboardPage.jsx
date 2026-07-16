@@ -242,6 +242,24 @@ export default function DashboardPage({ templates }) {
     }
   }
 
+  async function refreshSubscriptionCache(subscription) {
+    try {
+      const result = await apiFetch("/api/subscriptions/refresh", {
+        method: "POST",
+        body: JSON.stringify({
+          url: subscription.url,
+          userAgent: config.options.userAgent,
+        }),
+      });
+      const suffix = result.invalidatedLinkCount
+        ? `，已清除 ${result.invalidatedLinkCount} 个相关短链缓存`
+        : "";
+      showSuccess(`订阅缓存已刷新${suffix}`);
+    } catch (error) {
+      showError(error.message || "刷新订阅缓存失败。");
+    }
+  }
+
   async function importLink() {
     try {
       const rawInput = linkInput.trim();
@@ -411,6 +429,8 @@ export default function DashboardPage({ templates }) {
           <EditorSection eyebrow="Convert" title="订阅聚合" description="支持多个订阅地址与单节点混合输入">
             <SubscriptionEditor
               subscriptions={config.sources.subscriptions}
+              showRefresh={!config.options.refresh}
+              onRefresh={refreshSubscriptionCache}
               onChange={(subscriptions) =>
                 setConfig((current) => ({
                   ...current,

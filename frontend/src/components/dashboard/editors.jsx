@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, ChevronsUpDown, GripVertical, Plus, Trash2 } from "lucide-react";
+import { Check, ChevronsUpDown, GripVertical, Plus, RefreshCw, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandItem, CommandList } from "@/components/ui/command";
@@ -303,7 +303,7 @@ function SortableTableRow({
   );
 }
 
-function IconActionButton({ label, onClick, disabled = false, tone = "destructive" }) {
+function IconActionButton({ label, onClick, disabled = false, tone = "destructive", icon = "delete", loading = false }) {
   return (
     <Button
       type="button"
@@ -314,7 +314,11 @@ function IconActionButton({ label, onClick, disabled = false, tone = "destructiv
       onClick={onClick}
       className={cn(tone === "destructive" ? "" : "text-muted-foreground")}
     >
-      <Trash2 className="h-4 w-4" />
+      {icon === "refresh" ? (
+        <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
+      ) : (
+        <Trash2 className="h-4 w-4" />
+      )}
     </Button>
   );
 }
@@ -489,7 +493,21 @@ function BehaviorCombobox({ value, onChange, placeholder = "选择或输入行�
   );
 }
 
-export function SubscriptionEditor({ subscriptions, onChange }) {
+function canRefreshSubscription(item) {
+  if (item.enabled === false || !item.url) {
+    return false;
+  }
+
+  try {
+    const url = new URL(item.url);
+    return ["http:", "https:"].includes(url.protocol) && url.origin !== window.location.origin;
+  } catch {
+    return false;
+  }
+}
+
+export function SubscriptionEditor({ subscriptions, onChange, showRefresh = false, onRefresh }) {
+  const [refreshingRowKeys, setRefreshingRowKeys] = useState(() => new Set());
   const {
     rows,
     rowKeys,
@@ -509,6 +527,22 @@ export function SubscriptionEditor({ subscriptions, onChange }) {
     onChange,
   );
 
+  async function refreshRow(item, rowKey) {
+    if (!onRefresh || refreshingRowKeys.has(rowKey)) {
+      return;
+    }
+    setRefreshingRowKeys((current) => new Set(current).add(rowKey));
+    try {
+      await onRefresh(item);
+    } finally {
+      setRefreshingRowKeys((current) => {
+        const next = new Set(current);
+        next.delete(rowKey);
+        return next;
+      });
+    }
+  }
+
   return (
     <div>
       <TableFrame minWidthClassName="min-w-[50rem]">
@@ -519,7 +553,7 @@ export function SubscriptionEditor({ subscriptions, onChange }) {
               <TableHead>订阅地址</TableHead>
               <TableHead className="w-[14rem]">备注</TableHead>
               <EnabledTableHead />
-              <TableHead className="w-[5rem] text-center">操作</TableHead>
+              <TableHead className={cn(showRefresh ? "w-[8rem]" : "w-[5rem]", "text-center")}>操作</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -559,11 +593,23 @@ export function SubscriptionEditor({ subscriptions, onChange }) {
                   />
                 </TableCell>
                 <TableCell className="text-center">
-                  <IconActionButton
-                    label="删除订阅"
-                    disabled={!canDelete}
-                    onClick={() => deleteRow(index)}
-                  />
+                  <div className="flex items-center justify-center gap-1">
+                    {showRefresh ? (
+                      <IconActionButton
+                        label={`刷新订阅第 ${index + 1} 行缓存`}
+                        tone="ghost"
+                        icon="refresh"
+                        loading={refreshingRowKeys.has(rowKeys[index])}
+                        disabled={refreshingRowKeys.has(rowKeys[index]) || !canRefreshSubscription(item)}
+                        onClick={() => refreshRow(item, rowKeys[index])}
+                      />
+                    ) : null}
+                    <IconActionButton
+                      label="删除订阅"
+                      disabled={!canDelete}
+                      onClick={() => deleteRow(index)}
+                    />
+                  </div>
                 </TableCell>
               </SortableTableRow>
             ))}

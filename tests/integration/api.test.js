@@ -23,6 +23,34 @@ describe("worker api", () => {
     const env = createEnv();
     const response = await app.request("https://app.example.com/api/templates", {}, env);
     expect(response.status).toBe(401);
+
+    const refreshResponse = await app.request(
+      "https://app.example.com/api/subscriptions/refresh",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ url: "https://sub.example.com/config" })
+      },
+      env
+    );
+    expect(refreshResponse.status).toBe(401);
+  });
+
+  it("拒绝通过手动刷新接口处理同域订阅", async () => {
+    const env = createEnv();
+    const cookie = await login(env);
+    const response = await app.request(
+      "https://app.example.com/api/subscriptions/refresh",
+      {
+        method: "POST",
+        headers: { cookie, "content-type": "application/json" },
+        body: JSON.stringify({ url: "https://app.example.com/s/local-link" })
+      },
+      env
+    );
+
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toContain("同域订阅");
   });
 
   it("可以登录、管理模板、生成短链并输出订阅", async () => {
@@ -220,6 +248,132 @@ describe("worker api", () => {
     expect(yaml).toContain("节点选择");
     expect(yaml).toContain("DOMAIN-SUFFIX,example.com,DIRECT");
 
+    vi.unstubAllGlobals();
+  });
+
+  it("可以手动刷新单个外部订阅并立即失效短链 YAML 缓存", async () => {
+    const env = createEnv();
+    const cookie = await login(env);
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response("ss://YWVzLTI1Ni1nY206cGFzc0BleGFtcGxlLmNvbTo4NDQz#OldNode", {
+          headers: { "subscription-userinfo": "upload=1; total=10" }
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response("ss://YWVzLTI1Ni1nY206cGFzc0BleGFtcGxlLmNvbTo4NDQz#NewNode", {
+          headers: { "subscription-userinfo": "upload=2; total=10" }
+        })
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const linkResponse = await app.request(
+      "https://app.example.com/api/links",
+      {
+        method: "POST",
+        headers: { cookie, "content-type": "application/json" },
+        body: JSON.stringify({
+          remark: "缓存测试",
+          config: {
+            target: "meta",
+            sources: {
+              subscriptions: [{ enabled: true, url: "https://sub.example.com/config", remark: "测试源" }],
+              nodes: []
+            },
+            template: { mode: "builtin", value: "meta-default" },
+            routing: { ruleProviders: [], rules: [] },
+            transforms: { filterRegex: "", replacements: [] },
+            override: { type: "yaml", content: "" },
+            options: {
+              sort: "nameasc",
+              autoTest: false,
+              lazy: false,
+              refresh: false,
+              nodeList: false,
+              ignoreCountryGroup: false,
+              userAgent: "cache-tester",
+              useUDP: false
+            }
+          }
+        })
+      },
+      env
+    );
+    const link = await linkResponse.json();
+
+    const first = await app.request(`https://app.example.com/s/${link.id}`, {}, env);
+    expect(await first.text()).toContain("OldNode");
+    expect(first.headers.get("subscription-userinfo")).toContain("upload=1");
+
+    const second = await app.request(`https://app.example.com/s/${link.id}`, {}, env);
+    expect(await second.text()).toContain("OldNode");
+    expect(second.headers.get("subscription-userinfo")).toContain("upload=1");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    const refreshResponse = await app.request(
+      "https://app.example.com/api/subscriptions/refresh",
+      {
+        method: "POST",
+        headers: { cookie, "content-type": "application/json" },
+        body: JSON.stringify({ url: "https://sub.example.com/config", userAgent: "cache-tester" })
+      },
+      env
+    );
+    expect(refreshResponse.status).toBe(200);
+    expect(await refreshResponse.json()).toMatchObject({ ok: true, invalidatedLinkCount: 1 });
+    expect(fetchMock.mock.calls[1][1]).toMatchObject({ cache: "no-store" });
+
+    const third = await app.request(`https://app.example.com/s/${link.id}`, {}, env);
+    expect(await third.text()).toContain("NewNode");
+    expect(third.headers.get("subscription-userinfo")).toContain("upload=2");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    vi.unstubAllGlobals();
+  });
+
+  it("短链开启强制刷新后不会读取或写入最终 YAML 缓存", async () => {
+    const env = createEnv();
+    const cookie = await login(env);
+    const fetchMock = vi.fn(async () =>
+      new Response("ss://YWVzLTI1Ni1nY206cGFzc0BleGFtcGxlLmNvbTo4NDQz#FreshNode")
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const linkResponse = await app.request(
+      "https://app.example.com/api/links",
+      {
+        method: "POST",
+        headers: { cookie, "content-type": "application/json" },
+        body: JSON.stringify({
+          config: {
+            target: "meta",
+            sources: {
+              subscriptions: [{ url: "https://fresh.example.com/config", remark: "" }],
+              nodes: []
+            },
+            template: { mode: "builtin", value: "meta-default" },
+            routing: { ruleProviders: [], rules: [] },
+            transforms: { filterRegex: "", replacements: [] },
+            options: {
+              sort: "nameasc",
+              refresh: true,
+              nodeList: false,
+              userAgent: "",
+              useUDP: false
+            }
+          }
+        })
+      },
+      env
+    );
+    const link = await linkResponse.json();
+
+    await app.request(`https://app.example.com/s/${link.id}`, {}, env);
+    await app.request(`https://app.example.com/s/${link.id}`, {}, env);
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(await env.CACHE.get(`cache:link-yaml:${link.id}`)).toBeNull();
     vi.unstubAllGlobals();
   });
 });

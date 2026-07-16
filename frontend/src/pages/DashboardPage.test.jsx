@@ -180,4 +180,26 @@ describe("DashboardPage", () => {
     expect(screen.getByText("proxies: []", { exact: false })).toBeInTheDocument();
     expect(screen.getByText("仅输出节点列表时已忽略覆写")).toBeInTheDocument();
   });
+
+  it("可以逐条刷新外部订阅缓存并展示失效短链数量", async () => {
+    const user = userEvent.setup();
+    apiFetch
+      .mockResolvedValueOnce({ links: [] })
+      .mockResolvedValueOnce({ ok: true, invalidatedLinkCount: 2 });
+
+    render(<DashboardPage templates={templates} />);
+    await waitFor(() => expect(apiFetch).toHaveBeenCalledTimes(1));
+
+    await user.type(screen.getByRole("textbox", { name: "订阅地址" }), "https://sub.example.com/config");
+    await user.click(screen.getByRole("button", { name: "刷新订阅第 1 行缓存" }));
+
+    expect(apiFetch).toHaveBeenLastCalledWith(
+      "/api/subscriptions/refresh",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ url: "https://sub.example.com/config", userAgent: "" }),
+      }),
+    );
+    expect(await screen.findByText("订阅缓存已刷新，已清除 2 个相关短链缓存")).toBeInTheDocument();
+  });
 });

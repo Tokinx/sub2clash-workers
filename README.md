@@ -78,7 +78,7 @@ bun install
 APP_PASSWORD=your-local-password
 SESSION_SECRET=replace-with-a-random-secret
 SESSION_TTL_SECONDS=2592000
-SUB_CACHE_TTL_SECONDS=300
+SUB_CACHE_TTL_SECONDS=21600
 MAX_REMOTE_FILE_SIZE=1048576
 MAX_PROXY_COUNT=100
 MAX_SUBSCRIPTION_COUNT=10
@@ -99,7 +99,7 @@ bun run dev
 | `APP_PASSWORD`           | ✓    | 管理台登录密码               | -            |
 | `SESSION_SECRET`         | ✓    | 会话签名密钥                 | -            |
 | `SESSION_TTL_SECONDS`    | -    | Cookie 会话有效期            | 2592000 秒   |
-| `SUB_CACHE_TTL_SECONDS`  | -    | 远程订阅缓存 TTL             | 300 秒       |
+| `SUB_CACHE_TTL_SECONDS`  | -    | 远程订阅与短链 YAML 缓存 TTL | 21600 秒     |
 | `MAX_REMOTE_FILE_SIZE`   | -    | 单次远程订阅拉取大小上限     | 1048576 字节 |
 | `MAX_PROXY_COUNT`        | -    | 单次渲染最多处理的输入节点数 | 100          |
 | `MAX_SUBSCRIPTION_COUNT` | -    | 单份配置最多包含的订阅源数量 | 10           |

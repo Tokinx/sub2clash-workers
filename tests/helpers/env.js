@@ -56,7 +56,8 @@ class MemoryKV {
   async put(key, value, options = {}) {
     this.map.set(key, {
       value: String(value),
-      metadata: options.metadata ?? null
+      metadata: options.metadata ?? null,
+      expirationTtl: options.expirationTtl ?? null
     });
   }
 
@@ -104,7 +105,7 @@ export function createEnv(overrides = {}) {
     APP_PASSWORD: "test-password",
     SESSION_SECRET: "test-session-secret",
     SESSION_TTL_SECONDS: "2592000",
-    SUB_CACHE_TTL_SECONDS: "300",
+    SUB_CACHE_TTL_SECONDS: "21600",
     MAX_REMOTE_FILE_SIZE: "1048576",
     ...overrides
   };

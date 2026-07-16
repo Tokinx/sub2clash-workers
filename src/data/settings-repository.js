@@ -1,6 +1,7 @@
 import { randomId } from "../utils/crypto.js";
 import { badRequest, notFound } from "../utils/errors.js";
 import { SETTINGS_KEY } from "./keys.js";
+import { invalidateLinksByTemplate } from "./cache-dependencies.js";
 
 const MAX_TEMPLATE_COUNT = 20;
 const MAX_TEMPLATE_BYTES = 128 * 1024;
@@ -110,6 +111,7 @@ export async function updateTemplate(env, id, payload) {
     content: payload.content,
     updatedAt: new Date().toISOString()
   };
+  await invalidateLinksByTemplate(env, id);
   await saveSettings(env, settings);
   return settings.templates[index];
 }
@@ -120,6 +122,7 @@ export async function deleteTemplate(env, id) {
   if (index === -1) {
     throw notFound("模板不存在");
   }
+  await invalidateLinksByTemplate(env, id);
   settings.templates.splice(index, 1);
   await saveSettings(env, settings);
 }

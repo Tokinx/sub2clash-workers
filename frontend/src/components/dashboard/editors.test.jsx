@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
 
@@ -28,6 +28,21 @@ function SubscriptionDragHarness() {
   ]);
 
   return <SubscriptionEditor subscriptions={subscriptions} onChange={setSubscriptions} />;
+}
+
+function RefreshSubscriptionHarness({ onRefresh, showRefresh = true }) {
+  const [subscriptions, setSubscriptions] = useState([
+    { enabled: true, url: "https://sub.example.com/config", remark: "外部源" },
+    { enabled: false, url: "https://disabled.example.com/config", remark: "已关闭" },
+  ]);
+  return (
+    <SubscriptionEditor
+      subscriptions={subscriptions}
+      onChange={setSubscriptions}
+      showRefresh={showRefresh}
+      onRefresh={onRefresh}
+    />
+  );
 }
 
 function RuleProviderHarness() {
@@ -149,5 +164,34 @@ describe("dashboard table editors", () => {
       "https://example.com/source-c",
       "https://example.com/source-a",
     ]);
+  });
+
+  it("仅在非强制刷新模式显示逐行刷新按钮，并禁用关闭的订阅", async () => {
+    const user = userEvent.setup();
+    let finishRefresh;
+    const onRefresh = vi.fn(
+      () =>
+        new Promise((resolve) => {
+          finishRefresh = resolve;
+        }),
+    );
+
+    const { rerender } = render(<RefreshSubscriptionHarness onRefresh={onRefresh} showRefresh={false} />);
+    expect(screen.queryByRole("button", { name: /刷新订阅第 1 行缓存/ })).not.toBeInTheDocument();
+
+    rerender(<RefreshSubscriptionHarness onRefresh={onRefresh} showRefresh />);
+    const refreshButton = screen.getByRole("button", { name: "刷新订阅第 1 行缓存" });
+    expect(refreshButton).toBeEnabled();
+    expect(screen.getByRole("button", { name: "刷新订阅第 2 行缓存" })).toBeDisabled();
+
+    await user.click(refreshButton);
+    expect(onRefresh).toHaveBeenCalledWith(
+      expect.objectContaining({ url: "https://sub.example.com/config" }),
+    );
+    expect(refreshButton).toBeDisabled();
+    expect(refreshButton.querySelector("svg")).toHaveClass("animate-spin");
+
+    finishRefresh();
+    await waitFor(() => expect(refreshButton).toBeEnabled());
   });
 });

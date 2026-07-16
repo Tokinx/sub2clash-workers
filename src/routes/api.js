@@ -12,6 +12,7 @@ import {
   updateTemplate
 } from "../data/settings-repository.js";
 import { listBuiltinTemplates } from "../domain/builtin-templates.js";
+import { refreshExternalSubscription } from "../domain/cache.js";
 import { renderConfig } from "../domain/render.js";
 
 export function createApiRouter() {
@@ -40,6 +41,12 @@ export function createApiRouter() {
   protectedApi.post("/render", async (c) => {
     const body = await c.req.json();
     const result = await renderConfig(c.env, c.req.raw, body);
+    return c.json(result);
+  });
+
+  protectedApi.post("/subscriptions/refresh", async (c) => {
+    const body = await c.req.json();
+    const result = await refreshExternalSubscription(c.env, c.req.raw, body);
     return c.json(result);
   });
 
