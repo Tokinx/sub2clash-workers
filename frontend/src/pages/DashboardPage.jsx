@@ -1,4 +1,4 @@
-import { AlertCircle, Copy, Eye, Link2, RefreshCw, Search, Trash2, ExternalLink } from "lucide-react";
+import { AlertCircle, Copy, Eye, Link2, LoaderCircle, RefreshCw, Search, Trash2, ExternalLink } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import YAML from "yaml";
 
@@ -72,6 +72,8 @@ export default function DashboardPage({ templates }) {
   const [subscriptionInfo, setSubscriptionInfo] = useState("");
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [importLinkLoading, setImportLinkLoading] = useState(false);
+  const [updateShortLinkLoading, setUpdateShortLinkLoading] = useState(false);
 
   const templateOptions = useMemo(() => {
     const builtin = templates.builtin.map((item) => ({
@@ -261,6 +263,7 @@ export default function DashboardPage({ templates }) {
   }
 
   async function importLink() {
+    setImportLinkLoading(true);
     try {
       const rawInput = linkInput.trim();
       if (!rawInput) {
@@ -296,6 +299,8 @@ export default function DashboardPage({ templates }) {
       showError("暂不支持该链接格式。");
     } catch (error) {
       showError(error.message || "导入失败。");
+    } finally {
+      setImportLinkLoading(false);
     }
   }
 
@@ -322,6 +327,7 @@ export default function DashboardPage({ templates }) {
       return;
     }
 
+    setUpdateShortLinkLoading(true);
     try {
       const link = await apiFetch(`/api/links/${shortLinkId}`, {
         method: "PUT",
@@ -332,6 +338,8 @@ export default function DashboardPage({ templates }) {
       showSuccess("短链接已更新");
     } catch (error) {
       showError(error.message || "更新短链接失败。");
+    } finally {
+      setUpdateShortLinkLoading(false);
     }
   }
 
@@ -399,9 +407,9 @@ export default function DashboardPage({ templates }) {
                 />
               </Field>
               <div className="flex flex-wrap gap-3">
-                <Button type="button" className="lg:min-w-[7rem]" onClick={importLink}>
-                  <Search className="h-4 w-4" />
-                  <span>解析</span>
+                <Button type="button" className="lg:min-w-[7rem]" disabled={importLinkLoading} onClick={importLink}>
+                  {importLinkLoading ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                  <span>{importLinkLoading ? "解析中..." : "解析"}</span>
                 </Button>
               </div>
             </div>
@@ -778,9 +786,9 @@ export default function DashboardPage({ templates }) {
                       <Trash2 className="h-4 w-4" />
                       <span>删除</span>
                     </Button>
-                    <Button type="button" onClick={updateShortLink}>
-                      <RefreshCw className="h-4 w-4" />
-                      <span>更新短链接</span>
+                    <Button type="button" disabled={updateShortLinkLoading} onClick={updateShortLink}>
+                      {updateShortLinkLoading ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                      <span>{updateShortLinkLoading ? "更新中..." : "更新短链接"}</span>
                     </Button>
                   </div>
                 </div>
