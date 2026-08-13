@@ -33,4 +33,30 @@ describe("fetchTextWithRetry", () => {
       cache: "no-store"
     });
   });
+
+  it("4xx 视为永久性错误不重试", async () => {
+    const fetchMock = vi.fn(async () => new Response("Not Found", { status: 404 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      fetchTextWithRetry("https://sub.example.com/config", { retries: 2 })
+    ).rejects.toMatchObject({ status: 422 });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("5xx 按重试次数退避重试", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response("Server Error", { status: 503 }))
+      .mockResolvedValueOnce(new Response("subscription-body"));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await fetchTextWithRetry("https://sub.example.com/config", {
+      retries: 1
+    });
+
+    expect(result.text).toBe("subscription-body");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
 });
