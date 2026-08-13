@@ -29,11 +29,19 @@ function getClientIp(c) {
   return c.req.header("cf-connecting-ip") || "unknown";
 }
 
-// 登录限速计数存放在 Cache API（边缘缓存）而非 KV：
+// 登录限速计数存放在独立 Cache API 命名空间而非 KV：
 // 读写不消耗 KV 配额（免费层 KV 写仅 1 千次/天，暴力攻击反而会先刷爆），
-// 仅在登录失败时才产生 match/put。Cache API 是区域性、尽力而为的缓存，
+// 仅在登录失败时才产生 match/put。独立命名空间避免与 fetch() 子请求
+// 共享的 caches.default 相互驱逐。Cache API 是区域性、尽力而为的缓存，
 // 条目可能被回收或跨区域独立，限速因此是防御性降级而非绝对保证。
 const LOGIN_RATE_LIMIT_CACHE_HOST = "https://rate.internal";
+const LOGIN_RATE_LIMIT_CACHE_NAME = "sub2clash:ratelimit";
+
+let rateLimitCachePromise;
+function getRateLimitCache() {
+  rateLimitCachePromise ??= caches.open(LOGIN_RATE_LIMIT_CACHE_NAME);
+  return rateLimitCachePromise;
+}
 
 async function buildLoginRateKey(ip) {
   const hash = await sha256Hex(ip);
@@ -41,7 +49,7 @@ async function buildLoginRateKey(ip) {
 }
 
 async function readLoginFailures(ip) {
-  const cached = await caches.default.match(await buildLoginRateKey(ip));
+  const cached = await (await getRateLimitCache()).match(await buildLoginRateKey(ip));
   if (!cached) {
     return 0;
   }
@@ -49,7 +57,7 @@ async function readLoginFailures(ip) {
 }
 
 async function recordLoginFailure(ip, count) {
-  await caches.default.put(
+  await (await getRateLimitCache()).put(
     await buildLoginRateKey(ip),
     new Response(String(count), {
       headers: { "Cache-Control": `public, s-maxage=${LOGIN_RATE_LIMIT_WINDOW_SECONDS}` }
@@ -58,7 +66,7 @@ async function recordLoginFailure(ip, count) {
 }
 
 async function clearLoginFailures(ip) {
-  await caches.default.delete(await buildLoginRateKey(ip));
+  await (await getRateLimitCache()).delete(await buildLoginRateKey(ip));
 }
 
 export function createApiRouter() {
