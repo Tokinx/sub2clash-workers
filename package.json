@@ -9,7 +9,7 @@
     "dev": "cd frontend && bun run dev",
     "dev:worker": "wrangler dev --config wrangler.local.jsonc",
     "dev:frontend": "cd frontend && bun run dev",
-    "build": "bun run build:frontend",
+    "build": "bun run clean:public && bun run build:frontend",
     "build:frontend": "cd frontend && bun run build",
     "clean:public": "bun run scripts/prepare-public.mjs",
     "build:deploy": "bun run clean:public && bun run build:frontend",
