@@ -5,7 +5,7 @@
 - `POST /api/auth/login`
 - `POST /api/auth/logout`
 - `GET /api/auth/session`
-- 登录失败按来源 IP 计数限速：连续失败 10 次后返回 `429`，计数窗口 15 分钟，成功登录清除计数
+- 登录失败按来源 IP 计数限速：连续失败 10 次后返回 `429`，计数窗口 15 分钟，成功登录清除计数；计数存放在 Cache API，不消耗 KV 配额
 - 所有 `/api/*` 响应统一 `Cache-Control: no-store`，请求体限制 1MB
 
 ## 模板

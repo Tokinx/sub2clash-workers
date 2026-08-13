@@ -508,6 +508,22 @@ describe("worker api", () => {
     expect(otherIp.status).toBe(200);
   }, 20000);
 
+  it("登录限速计数存放在 Cache API，不写入 KV", async () => {
+    const env = createEnv();
+    await app.request(
+      "https://app.example.com/api/auth/login",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ password: "wrong-password" })
+      },
+      env
+    );
+
+    const listed = await env.CACHE.list({ prefix: "rate:login:" });
+    expect(listed.keys).toHaveLength(0);
+  });
+
   it("超长订阅 payload 与超量规则被拒绝", async () => {
     const env = createEnv();
 

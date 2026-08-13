@@ -685,7 +685,7 @@
 - 安全：
   - 移除 `SESSION_SECRET` 硬编码 fallback，未配置时拒绝签发/验证会话
   - 会话签名改用恒定时间比较
-  - 登录失败按 IP 限速（10 次/15 分钟）+ 固定延时，成功登录清除计数
+  - 登录失败按 IP 限速（10 次/15 分钟）+ 固定延时，成功登录清除计数；计数存放于 Cache API，不消耗 KV 配额
   - `/sub/:payload` payload 上限 32KB；rules ≤ 50、ruleProviders ≤ 20、replacements ≤ 50、override ≤ 64KB、filterRegex ≤ 1KB
   - 未知 `/api/*` 返回 404 JSON；API 响应统一 `no-store`；请求体限制 1MB
 - 可靠性：

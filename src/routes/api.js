@@ -15,6 +15,7 @@ import { listBuiltinTemplates } from "../domain/builtin-templates.js";
 import { refreshExternalSubscription } from "../domain/cache.js";
 import { renderConfig } from "../domain/render.js";
 import { badRequest, tooManyRequests } from "../utils/errors.js";
+import { sha256Hex } from "../utils/crypto.js";
 
 const MAX_API_BODY_BYTES = 1024 * 1024;
 const LOGIN_RATE_LIMIT_MAX = 10;
@@ -26,6 +27,38 @@ function sleep(ms) {
 
 function getClientIp(c) {
   return c.req.header("cf-connecting-ip") || "unknown";
+}
+
+// 登录限速计数存放在 Cache API（边缘缓存）而非 KV：
+// 读写不消耗 KV 配额（免费层 KV 写仅 1 千次/天，暴力攻击反而会先刷爆），
+// 仅在登录失败时才产生 match/put。Cache API 是区域性、尽力而为的缓存，
+// 条目可能被回收或跨区域独立，限速因此是防御性降级而非绝对保证。
+const LOGIN_RATE_LIMIT_CACHE_HOST = "https://rate.internal";
+
+async function buildLoginRateKey(ip) {
+  const hash = await sha256Hex(ip);
+  return `${LOGIN_RATE_LIMIT_CACHE_HOST}/login/${hash}`;
+}
+
+async function readLoginFailures(ip) {
+  const cached = await caches.default.match(await buildLoginRateKey(ip));
+  if (!cached) {
+    return 0;
+  }
+  return Number(await cached.text()) || 0;
+}
+
+async function recordLoginFailure(ip, count) {
+  await caches.default.put(
+    await buildLoginRateKey(ip),
+    new Response(String(count), {
+      headers: { "Cache-Control": `public, s-maxage=${LOGIN_RATE_LIMIT_WINDOW_SECONDS}` }
+    })
+  );
+}
+
+async function clearLoginFailures(ip) {
+  await caches.default.delete(await buildLoginRateKey(ip));
 }
 
 export function createApiRouter() {
@@ -47,8 +80,7 @@ export function createApiRouter() {
 
   api.post("/auth/login", async (c) => {
     const ip = getClientIp(c);
-    const rateKey = `rate:login:${ip}`;
-    const failures = Number((await c.env.CACHE.get(rateKey)) || 0);
+    const failures = await readLoginFailures(ip);
     if (failures >= LOGIN_RATE_LIMIT_MAX) {
       throw tooManyRequests("登录尝试过于频繁，请稍后再试");
     }
@@ -57,14 +89,12 @@ export function createApiRouter() {
     try {
       await verifyPassword(body.password, c.env);
     } catch (error) {
-      // 失败计数（带 TTL 自动过期）+ 固定延时，同时防爆破与时序探测
-      await c.env.CACHE.put(rateKey, String(failures + 1), {
-        expirationTtl: LOGIN_RATE_LIMIT_WINDOW_SECONDS
-      });
+      // 失败计数写入 Cache API（s-maxage 控制过期）+ 固定延时，同时防爆破与时序探测
+      await recordLoginFailure(ip, failures + 1);
       await sleep(500);
       throw error;
     }
-    await c.env.CACHE.delete(rateKey);
+    await clearLoginFailures(ip);
     c.header("Set-Cookie", await createSessionCookie(c.env, c.req.raw));
     return c.json({ ok: true });
   });
