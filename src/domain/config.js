@@ -14,12 +14,25 @@ const DEFAULT_OPTIONS = {
 
 const VALID_SORTS = new Set(["nameasc", "namedesc", "sizeasc", "sizedesc"]);
 
+// 配置负载护栏：/sub/:payload 未认证可访问，限制数量与大小防 CPU DoS
+const MAX_RULE_COUNT = 50;
+const MAX_RULE_PROVIDER_COUNT = 20;
+const MAX_REPLACEMENT_COUNT = 50;
+const MAX_OVERRIDE_BYTES = 64 * 1024;
+const MAX_FILTER_REGEX_BYTES = 1024;
+
 function ensureArray(value) {
   return Array.isArray(value) ? value : [];
 }
 
 function isRowEnabled(item) {
   return item?.enabled !== false;
+}
+
+function assertMaxCount(items, limit, label) {
+  if (items.length > limit) {
+    throw badRequest(`${label}数量不能超过 ${limit}`);
+  }
 }
 
 export function validateAndNormalizeConfig(input) {
@@ -83,7 +96,9 @@ export function validateAndNormalizeConfig(input) {
     throw badRequest("template 配置无效");
   }
 
-  const ruleProviders = ensureArray(input.routing?.ruleProviders).map((provider) => {
+  const ruleProviders = ensureArray(input.routing?.ruleProviders);
+  assertMaxCount(ruleProviders, MAX_RULE_PROVIDER_COUNT, "rule provider");
+  const ruleProviderList = ruleProviders.map((provider) => {
     if (!provider || typeof provider !== "object" || Array.isArray(provider)) {
       throw badRequest("rule provider 配置不完整");
     }
@@ -105,14 +120,16 @@ export function validateAndNormalizeConfig(input) {
   });
 
   const names = new Set();
-  for (const provider of ruleProviders.filter((item) => item.enabled)) {
+  for (const provider of ruleProviderList.filter((item) => item.enabled)) {
     if (names.has(provider.name)) {
       throw badRequest("rule provider 名称不能重复");
     }
     names.add(provider.name);
   }
 
-  const rules = ensureArray(input.routing?.rules).map((rule) => {
+  const rules = ensureArray(input.routing?.rules);
+  assertMaxCount(rules, MAX_RULE_COUNT, "规则");
+  const ruleList = rules.map((rule) => {
     if (!rule || typeof rule !== "object" || Array.isArray(rule)) {
       throw badRequest("规则内容不能为空");
     }
@@ -130,7 +147,9 @@ export function validateAndNormalizeConfig(input) {
     return normalized;
   });
 
-  const replacements = ensureArray(input.transforms?.replacements).map((item) => {
+  const replacements = ensureArray(input.transforms?.replacements);
+  assertMaxCount(replacements, MAX_REPLACEMENT_COUNT, "替换规则");
+  const replacementList = replacements.map((item) => {
     if (!item || typeof item !== "object" || Array.isArray(item)) {
       throw badRequest("替换规则 pattern 不能为空");
     }
@@ -174,9 +193,14 @@ export function validateAndNormalizeConfig(input) {
       throw badRequest("override.content 必须是字符串");
     }
 
+    const overrideContent = String(input.override.content || "");
+    if (new TextEncoder().encode(overrideContent).byteLength > MAX_OVERRIDE_BYTES) {
+      throw badRequest(`override.content 超过大小限制`);
+    }
+
     override = {
       type: "yaml",
-      content: String(input.override.content || "")
+      content: overrideContent
     };
   }
 
@@ -184,6 +208,11 @@ export function validateAndNormalizeConfig(input) {
     options.sort = DEFAULT_OPTIONS.sort;
   }
   options.autoFlag = options.autoFlag === true;
+
+  const filterRegex = String(input.transforms?.filterRegex || "");
+  if (new TextEncoder().encode(filterRegex).byteLength > MAX_FILTER_REGEX_BYTES) {
+    throw badRequest("filterRegex 超过大小限制");
+  }
 
   return {
     target,
@@ -196,12 +225,12 @@ export function validateAndNormalizeConfig(input) {
       value: String(template.value)
     },
     routing: {
-      ruleProviders,
-      rules
+      ruleProviders: ruleProviderList,
+      rules: ruleList
     },
     transforms: {
-      filterRegex: String(input.transforms?.filterRegex || ""),
-      replacements
+      filterRegex,
+      replacements: replacementList
     },
     override,
     options

@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 
-import { AppError } from "./utils/errors.js";
+import { AppError, badRequest } from "./utils/errors.js";
 import { decodeBase64UrlText } from "./utils/base64url.js";
 import { syncLinkCacheDependencies } from "./data/cache-dependencies.js";
 import { putCachedLinkOutput } from "./data/link-output-cache.js";
@@ -14,6 +14,8 @@ const LONG_PAYLOAD_EDGE_TTL_SECONDS = 21_600;
 // /s/:id 的链接配置可被修改，边缘缓存使用短 TTL 兜底，
 // 精确失效仍由 KV 输出缓存的 invalidateLinkCaches 承担
 const SHORT_LINK_EDGE_TTL_SECONDS = 300;
+// base64url 解码前限制原始 payload 长度，防未认证 CPU DoS
+const MAX_SUB_PAYLOAD_BYTES = 32 * 1024;
 
 // 缓存回写放到后台执行：真实运行时用 ExecutionContext.waitUntil（不阻塞响应），
 // 无 ExecutionContext 的环境（如测试）直接等待，保证行为可断言
@@ -49,6 +51,9 @@ app.onError((error, c) => {
 
 app.get("/sub/:payload", async (c) => {
   const payload = c.req.param("payload");
+  if (payload.length > MAX_SUB_PAYLOAD_BYTES) {
+    throw badRequest("订阅参数过长");
+  }
   const config = JSON.parse(decodeBase64UrlText(payload));
   const result = await renderConfig(c.env, c.req.raw, config);
   if (result.subscriptionUserinfo) {
@@ -91,6 +96,16 @@ app.get("/s/:id", async (c) => {
 });
 
 app.route("/api", createApiRouter());
+
+// 未匹配的 /api/* 返回 404 JSON，避免落入 SPA fallback 返回 200 HTML
+app.all("/api/*", (c) =>
+  c.json(
+    {
+      error: "接口不存在"
+    },
+    404
+  )
+);
 
 app.all("*", async (c) => c.env.ASSETS.fetch(c.req.raw));
 

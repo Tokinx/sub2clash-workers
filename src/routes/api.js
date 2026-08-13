@@ -14,16 +14,57 @@ import {
 import { listBuiltinTemplates } from "../domain/builtin-templates.js";
 import { refreshExternalSubscription } from "../domain/cache.js";
 import { renderConfig } from "../domain/render.js";
+import { badRequest, tooManyRequests } from "../utils/errors.js";
+
+const MAX_API_BODY_BYTES = 1024 * 1024;
+const LOGIN_RATE_LIMIT_MAX = 10;
+const LOGIN_RATE_LIMIT_WINDOW_SECONDS = 15 * 60;
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function getClientIp(c) {
+  return c.req.header("cf-connecting-ip") || "unknown";
+}
 
 export function createApiRouter() {
   const api = new Hono();
   const protectedApi = new Hono();
 
+  // API 响应一律 no-store，避免浏览器启发式缓存会话状态；
+  // 认证接口统一限制请求体大小
+  api.use("*", async (c, next) => {
+    c.header("Cache-Control", "no-store");
+    const contentLength = Number(c.req.header("content-length") || 0);
+    if (contentLength > MAX_API_BODY_BYTES) {
+      throw badRequest("请求体过大");
+    }
+    await next();
+  });
+
   protectedApi.use("/*", requireSession);
 
   api.post("/auth/login", async (c) => {
+    const ip = getClientIp(c);
+    const rateKey = `rate:login:${ip}`;
+    const failures = Number((await c.env.CACHE.get(rateKey)) || 0);
+    if (failures >= LOGIN_RATE_LIMIT_MAX) {
+      throw tooManyRequests("登录尝试过于频繁，请稍后再试");
+    }
+
     const body = await c.req.json();
-    await verifyPassword(body.password, c.env);
+    try {
+      await verifyPassword(body.password, c.env);
+    } catch (error) {
+      // 失败计数（带 TTL 自动过期）+ 固定延时，同时防爆破与时序探测
+      await c.env.CACHE.put(rateKey, String(failures + 1), {
+        expirationTtl: LOGIN_RATE_LIMIT_WINDOW_SECONDS
+      });
+      await sleep(500);
+      throw error;
+    }
+    await c.env.CACHE.delete(rateKey);
     c.header("Set-Cookie", await createSessionCookie(c.env, c.req.raw));
     return c.json({ ok: true });
   });

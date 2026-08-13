@@ -1,7 +1,7 @@
 import { parse, serialize } from "cookie";
 
 import { decodeBase64UrlText, encodeBase64UrlBytes, encodeBase64UrlText } from "../utils/base64url.js";
-import { hmacSha256 } from "../utils/crypto.js";
+import { constantTimeEqualStrings, hmacSha256 } from "../utils/crypto.js";
 import { unauthorized } from "../utils/errors.js";
 
 const SESSION_COOKIE_NAME = "sub2clash_session";
@@ -11,7 +11,12 @@ function getSessionTtl(env) {
 }
 
 function getSessionSecret(env) {
-  return env.SESSION_SECRET || "development-session-secret";
+  // 不允许 fallback 到公开已知密钥：未配置时拒绝签发/验证，
+  // 避免任何部署路径下可离线伪造会话
+  if (!env.SESSION_SECRET) {
+    throw new Error("服务端未配置 SESSION_SECRET");
+  }
+  return env.SESSION_SECRET;
 }
 
 async function signPayload(env, payload) {
@@ -39,7 +44,7 @@ export async function verifySessionToken(token, env) {
 
   const [payload, signature] = token.split(".");
   const expected = await signPayload(env, payload);
-  if (signature !== expected) {
+  if (!(await constantTimeEqualStrings(signature, expected))) {
     throw unauthorized();
   }
 

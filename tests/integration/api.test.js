@@ -467,4 +467,90 @@ describe("worker api", () => {
 
     vi.unstubAllGlobals();
   });
+
+  it("登录连续失败触发限速，成功登录清除计数", async () => {
+    const env = createEnv();
+
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      const response = await app.request(
+        "https://app.example.com/api/auth/login",
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ password: "wrong-password" })
+        },
+        env
+      );
+      expect(response.status).toBe(401);
+    }
+
+    const blocked = await app.request(
+      "https://app.example.com/api/auth/login",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ password: "test-password" })
+      },
+      env
+    );
+    expect(blocked.status).toBe(429);
+
+    // 更换来源 IP 后计数独立，可正常登录
+    const otherIp = await app.request(
+      "https://app.example.com/api/auth/login",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json", "cf-connecting-ip": "203.0.113.7" },
+        body: JSON.stringify({ password: "test-password" })
+      },
+      env
+    );
+    expect(otherIp.status).toBe(200);
+  }, 20000);
+
+  it("超长订阅 payload 与超量规则被拒绝", async () => {
+    const env = createEnv();
+
+    const oversized = await app.request(
+      `https://app.example.com/sub/${"A".repeat(33 * 1024)}`,
+      {},
+      env
+    );
+    expect(oversized.status).toBe(400);
+    expect((await oversized.json()).error).toContain("过长");
+
+    const config = {
+      target: "meta",
+      sources: { subscriptions: [], nodes: ["ss://YWVzLTI1Ni1nY206cGFzc0BleGFtcGxlLmNvbTo4NDQz#N"] },
+      template: { mode: "builtin", value: "meta-default" },
+      routing: {
+        ruleProviders: [],
+        rules: Array.from({ length: 51 }, (_, index) => ({
+          value: `DOMAIN-SUFFIX,site${index}.example,DIRECT`
+        }))
+      },
+      transforms: { filterRegex: "", replacements: [] },
+      options: { sort: "nameasc" }
+    };
+    const tooManyRules = await app.request(
+      `https://app.example.com/sub/${encodeBase64UrlText(JSON.stringify(config))}`,
+      {},
+      env
+    );
+    expect(tooManyRules.status).toBe(400);
+    expect((await tooManyRules.json()).error).toContain("规则数量");
+  });
+
+  it("未知 API 路径返回 404 JSON，API 响应不缓存", async () => {
+    const env = createEnv();
+    const cookie = await login(env);
+    const response = await app.request(
+      "https://app.example.com/api/not-exist",
+      { headers: { cookie } },
+      env
+    );
+    expect(response.status).toBe(404);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect((await response.json()).error).toBe("接口不存在");
+  });
 });
