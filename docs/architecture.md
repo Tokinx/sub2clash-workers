@@ -27,9 +27,16 @@
 
 - `SUB_CACHE_TTL_SECONDS` 同时控制外部订阅与短链 YAML 缓存，默认值为 `21600`
 - 长链接 `/sub/:payload` 与管理台 `/api/render` 不缓存最终 YAML；仅 `/s/:id` 在 `options.refresh = false` 时读写最终 YAML 缓存
+- 订阅输出同时使用 Cloudflare 边缘缓存（HTTP `Cache-Control`）与 KV 两层：
+  - `/sub/:payload` 响应 `public, s-maxage=21600`：payload 即配置指纹，URL 变化即新缓存条目，无失效问题
+  - `/s/:id` 响应 `public, s-maxage=300`：链接配置可被修改，短 TTL 兜底，精确失效仍由 KV 的 `invalidateLinkCaches` 承担
+  - 任一端点 `options.refresh = true` 时响应 `no-store`，强制刷新语义不受边缘缓存影响
+  - 边缘缓存命中时 Worker 完全不执行，轮询型订阅客户端的请求数、CPU 与 KV 读取同步下降
+- 短链 YAML 缓存写入与依赖索引同步移至 `ExecutionContext.waitUntil` 后台执行，两者并行且失败不影响响应；命中路径只读输出缓存（1 次 KV 读），未命中才读短链记录
 - 管理台可单独刷新一个不同源的 HTTP/HTTPS 订阅；刷新使用 `no-store` 抓取，成功后覆盖订阅缓存，失败时保留旧值
 - 手动刷新外部订阅、更新或删除短链、更新或删除自建模板时，会从直接依赖开始递归清除所有父短链 YAML 缓存
-- `options.refresh = true` 会同时绕过外部订阅缓存与短链 YAML 缓存，且不会写回任一缓存
+- 依赖索引（`cache:deps:*`）在依赖集合未变化时跳过全部写入；每次输出缓存过期后的冷渲染多数情况下依赖并无变化
+- `options.refresh = true` 会同时绕过外部订阅缓存、短链 YAML 缓存与边缘缓存，且不会写回任一缓存
 
 ## 配置覆写
 
@@ -73,15 +80,29 @@
 
 - 渲染链路默认最多接收 10 个订阅源，受 `MAX_SUBSCRIPTION_COUNT` 控制
 - 单次渲染默认最多处理 100 个输入节点，受 `MAX_PROXY_COUNT` 控制；限制同时覆盖远程订阅、内联节点、同域订阅与模板/覆写后的最终节点
+- 订阅源按并发上限 4 分批抓取，缩短多源渲染延迟，同时避免同时打满上游
 - `options.refresh = true` 强制绕过远程订阅与短链 YAML KV 缓存；正常模式仅缓存短链接最终 YAML
 - 节点分享链接文本与 Base64 节点列表优先走轻量解析，只有 Clash YAML 内容才进入完整 YAML 解析
 - 空规则增强与空 YAML 覆写不会复制整份配置对象
+- 单行节点解析失败时跳过该行，不再让一个坏节点毁掉整个订阅；全局节点数量上限仍为必须强制的业务错误
+- YAML 输出使用 `lineWidth: 0`，长节点名/URL 保持单行，输出更紧凑
+
+## 配置负载护栏
+
+- `/sub/:payload` 的 payload 上限 32KB（base64url 解码前检查）
+- `routing.rules` ≤ 50、`routing.ruleProviders` ≤ 20、`transforms.replacements` ≤ 50
+- `override.content` ≤ 64KB、`filterRegex` ≤ 1KB
+- 以上限制同时约束未认证可访问的长链接路径，防止构造大 payload 消耗 CPU
 
 ## 安全模型
 
 - 管理 API 需要会话 Cookie
 - 密码来源于 `APP_PASSWORD`
-- 会话签名来源于 `SESSION_SECRET`
+- 会话签名来源于 `SESSION_SECRET`，未配置时拒绝签发/验证，不存在公开 fallback 密钥
+- 会话签名比较使用恒定时间算法
+- 登录失败按来源 IP 计数限速（10 次/15 分钟，KV 计数带 TTL），成功登录清除计数；失败响应附加固定延时防时序探测
+- 管理 API 请求体限制 1MB，响应统一 `Cache-Control: no-store`
+- 未知 `/api/*` 路径返回 404 JSON，不会落入 SPA fallback
 - 订阅链接视为敏感凭据，但保持公开可访问
 
 ## 当前实现状态
@@ -93,3 +114,6 @@
 - 本地开发入口切换为 `frontend/vite.config.js` + `@cloudflare/vite-plugin`
 - 开发时由 Vite 驱动 HMR，Worker 仍作为统一入口处理静态资源与动态接口
 - 前端基础 UI 已迁移到 `shadcn/ui`，视觉主题继续由 `frontend/src/styles.css` 的暖色 token 控制
+- 前端按页面做代码分割（`React.lazy`），登录页与编辑器按需加载，主包从 552KB 降至约 270KB
+- `bun run build` 会先清理 `public/` 下旧前端产物再构建，部署上传量从约 8.1MB 降至约 0.6MB
+- 首页与静态路径由 Workers Assets 直接服务，不执行 Worker（`run_worker_first` 排除 `/`、`/index.html`、`/favicon.ico`）

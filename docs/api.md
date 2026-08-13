@@ -5,6 +5,8 @@
 - `POST /api/auth/login`
 - `POST /api/auth/logout`
 - `GET /api/auth/session`
+- 登录失败按来源 IP 计数限速：连续失败 10 次后返回 `429`，计数窗口 15 分钟，成功登录清除计数
+- 所有 `/api/*` 响应统一 `Cache-Control: no-store`，请求体限制 1MB
 
 ## 模板
 
@@ -36,6 +38,8 @@
 - 单次渲染默认最多处理 100 个输入节点，由 `MAX_PROXY_COUNT` 调整；远程订阅、内联节点、同域订阅及模板/覆写最终结果均受此限制
 - `options.refresh = true` 会绕过远程订阅和短链 YAML KV 缓存，且不写回缓存
 - `/sub/:payload` 与 `POST /api/render` 不缓存最终 YAML；`/s/:id` 在非强制刷新模式下缓存最终 YAML
+- 订阅输出响应带边缘缓存头：`/sub/:payload` 为 `public, s-maxage=21600`，`/s/:id` 为 `public, s-maxage=300`；`options.refresh = true` 时两者均为 `no-store`
+- 长链接 payload 上限 32KB；`routing.rules` ≤ 50、`routing.ruleProviders` ≤ 20、`transforms.replacements` ≤ 50、`override.content` ≤ 64KB、`filterRegex` ≤ 1KB，超出返回 `400`
 
 ## 订阅缓存
 
@@ -63,5 +67,7 @@
 - 认证失败：`401`
 - 参数错误：`400`
 - 不存在：`404`
+- 登录过于频繁：`429`
 - 远程加载或模板处理失败：`422`
 - 服务内部错误：`500`
+- 未知 `/api/*` 路径：`404` JSON（不会落入 SPA fallback）

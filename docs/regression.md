@@ -668,3 +668,41 @@
   - 前端生产构建通过
 - 现存风险：
   - Vite 仍提示主包体积超过 500 kB，本次未处理拆包
+
+## 全面审查与资源优化回归 2026-08-13
+
+- 状态：已完成
+- 目标：全面审查 Worker、前端与构建链路，实施资源成本、安全、可靠性三类优化
+- 资源成本：
+  - `/sub/:payload` 与 `/s/:id` 增加边缘缓存头（`s-maxage` 21600 / 300），refresh 请求 `no-store`；边缘命中时 Worker 零执行
+  - 短链 YAML 缓存写入与依赖索引同步移至 `waitUntil` 后台并行执行；命中路径 KV 读从 2 次降为 1 次
+  - 依赖索引仅在集合变化时写入 KV，冷渲染不再产生写放大
+  - 上游抓取 4xx 不再重试（出站请求数 ÷3），仅 5xx/超时/网络错误退避重试
+  - 订阅源按并发上限 4 分批抓取，缩短多源渲染延迟
+  - `bun run build` 先清理旧前端产物；部署上传量从约 8.1MB 降至约 0.6MB
+  - 前端页面级代码分割：主包 552KB → 270KB（gzip 174KB → 86KB），编辑器重依赖懒加载
+  - `run_worker_first` 排除 `/`、`/index.html`、`/favicon.ico`，首页直接由 Assets 服务
+- 安全：
+  - 移除 `SESSION_SECRET` 硬编码 fallback，未配置时拒绝签发/验证会话
+  - 会话签名改用恒定时间比较
+  - 登录失败按 IP 限速（10 次/15 分钟）+ 固定延时，成功登录清除计数
+  - `/sub/:payload` payload 上限 32KB；rules ≤ 50、ruleProviders ≤ 20、replacements ≤ 50、override ≤ 64KB、filterRegex ≤ 1KB
+  - 未知 `/api/*` 返回 404 JSON；API 响应统一 `no-store`；请求体限制 1MB
+- 可靠性：
+  - 单行节点解析失败跳过坏行，不再毁掉整个订阅；非法 payload 返回 400 而非 500
+  - filterRegex 每次 test 前重置 lastIndex，防止状态化误过滤
+  - YAML 输出 `lineWidth: 0` 不折行
+- 测试：
+  - `bun run test:worker`
+  - `bun run test:frontend`
+  - `bun run test`
+  - `bun run build`
+- 结果：
+  - Worker 侧 8 个测试文件、93 个用例通过（新增 17 个：缓存头、限速、护栏、404、会话篡改/过期/错误密钥、依赖索引跳过、并发抓取、坏行跳过、过滤行为）
+  - 前端 7 个测试文件、25 个用例通过
+  - 前端生产构建成功，产物仅约 600KB
+- 现存风险：
+  - `/s/:id` 边缘缓存 TTL 为 5 分钟：修改链接配置后最长 5 分钟生效（KV 精确失效不受影响，refresh 分支不缓存）
+  - 边缘缓存命中期间 `subscription-userinfo` 流量统计头最长滞后 6 小时（`/sub/:payload`）
+  - wrangler v4.13 schema 不支持 assets 自定义 `cache_control`，hashed 资源缓存沿用 Assets 默认 ETag/条件请求
+  - 登录限速计数为 KV 键（`rate:login:{ip}`），带 TTL 自动过期，不占用永久存储
