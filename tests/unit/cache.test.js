@@ -104,4 +104,22 @@ describe("subscription and link caches", () => {
 
     expect(await env.CACHE.get(buildLinkYamlCacheKey(link.id))).toBeNull();
   });
+
+  it("依赖集合未变化时重复同步不再写入 KV", async () => {
+    const env = createEnv();
+    const link = await createLink(env, { version: 1 });
+    const deps = { sources: ["source-a", "source-b"], templates: ["tpl-1"], children: [] };
+
+    await syncLinkCacheDependencies(env, link.id, deps);
+
+    const putSpy = vi.spyOn(env.CACHE, "put");
+    const deleteSpy = vi.spyOn(env.CACHE, "delete");
+    await syncLinkCacheDependencies(env, link.id, deps);
+    expect(putSpy).not.toHaveBeenCalled();
+    expect(deleteSpy).not.toHaveBeenCalled();
+
+    // 反向索引依然有效，失效路径不受影响
+    const invalidated = await invalidateLinksBySource(env, "source-a");
+    expect(invalidated).toEqual([link.id]);
+  });
 });

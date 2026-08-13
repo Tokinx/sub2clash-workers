@@ -5,6 +5,7 @@ import {
   buildTemplateDependentsKey
 } from "./keys.js";
 import { deleteCachedLinkOutput } from "./link-output-cache.js";
+import { stableStringify } from "../utils/object.js";
 
 function normalizeList(value) {
   return [...new Set(Array.isArray(value) ? value.filter((item) => typeof item === "string" && item) : [])].sort();
@@ -54,13 +55,22 @@ export async function removeLinkCacheDependencies(env, id) {
 
 export async function syncLinkCacheDependencies(env, id, dependencies) {
   const next = normalizeDependencies(dependencies);
+  const key = buildLinkDependencyKey(id);
+
+  // 依赖集合未变化时跳过全部写入：每次输出缓存过期后的冷渲染都会走到这里，
+  // 多数情况下依赖并无变化，而 KV 写是计费单价最高的操作
+  const current = normalizeDependencies(await env.CACHE.get(key, "json"));
+  if (stableStringify(current) === stableStringify(next)) {
+    return;
+  }
+
   await removeLinkCacheDependencies(env, id);
   await Promise.all(
     dependencyEntries(next).map(([reverseKey]) =>
       updateStringList(env, reverseKey, (items) => [...items, id])
     )
   );
-  await env.CACHE.put(buildLinkDependencyKey(id), JSON.stringify(next));
+  await env.CACHE.put(key, JSON.stringify(next));
 }
 
 export async function invalidateLinkCaches(env, initialIds) {
