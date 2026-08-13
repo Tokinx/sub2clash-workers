@@ -12,7 +12,7 @@ const TemplatesPage = lazy(() => import("./pages/TemplatesPage.jsx"));
 
 function PageFallback() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[var(--paper)] text-muted-foreground">
+    <div className="fixed inset-0 z-9 flex min-h-screen items-center justify-center bg-[var(--paper)] text-muted-foreground">
       正在加载...
     </div>
   );
