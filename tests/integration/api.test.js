@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import app from "../../src/index.js";
+import { encodeBase64UrlText } from "../../src/utils/base64url.js";
 import { createEnv } from "../helpers/env.js";
 
 async function login(env) {
@@ -369,11 +370,101 @@ describe("worker api", () => {
     );
     const link = await linkResponse.json();
 
-    await app.request(`https://app.example.com/s/${link.id}`, {}, env);
+    const first = await app.request(`https://app.example.com/s/${link.id}`, {}, env);
+    expect(first.headers.get("cache-control")).toBe("no-store");
     await app.request(`https://app.example.com/s/${link.id}`, {}, env);
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(await env.CACHE.get(`cache:link-yaml:${link.id}`)).toBeNull();
+    vi.unstubAllGlobals();
+  });
+
+  it("订阅输出设置边缘缓存头，refresh 请求不缓存", async () => {
+    const env = createEnv();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("ss://YWVzLTI1Ni1nY206cGFzc0BleGFtcGxlLmNvbTo4NDQz#CachedNode"))
+    );
+
+    const buildConfig = (refresh) => ({
+      target: "meta",
+      sources: {
+        subscriptions: [{ enabled: true, url: "https://sub.example.com/config", remark: "" }],
+        nodes: []
+      },
+      template: { mode: "builtin", value: "meta-default" },
+      routing: { ruleProviders: [], rules: [] },
+      transforms: { filterRegex: "", replacements: [] },
+      override: { type: "yaml", content: "" },
+      options: {
+        sort: "nameasc",
+        refresh,
+        nodeList: false,
+        userAgent: "",
+        useUDP: false
+      }
+    });
+
+    const normalPayload = encodeBase64UrlText(JSON.stringify(buildConfig(false)));
+    const normal = await app.request(`https://app.example.com/sub/${normalPayload}`, {}, env);
+    expect(normal.status).toBe(200);
+    expect(normal.headers.get("cache-control")).toBe("public, s-maxage=21600");
+
+    const refreshPayload = encodeBase64UrlText(JSON.stringify(buildConfig(true)));
+    const refresh = await app.request(`https://app.example.com/sub/${refreshPayload}`, {}, env);
+    expect(refresh.status).toBe(200);
+    expect(refresh.headers.get("cache-control")).toBe("no-store");
+
+    vi.unstubAllGlobals();
+  });
+
+  it("短链输出设置边缘缓存头，缓存命中响应同样携带", async () => {
+    const env = createEnv();
+    const cookie = await login(env);
+    const fetchMock = vi.fn(async () =>
+      new Response("ss://YWVzLTI1Ni1nY206cGFzc0BleGFtcGxlLmNvbTo4NDQz#EdgeNode")
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const linkResponse = await app.request(
+      "https://app.example.com/api/links",
+      {
+        method: "POST",
+        headers: { cookie, "content-type": "application/json" },
+        body: JSON.stringify({
+          remark: "边缘缓存测试",
+          config: {
+            target: "meta",
+            sources: {
+              subscriptions: [{ enabled: true, url: "https://edge.example.com/config", remark: "" }],
+              nodes: []
+            },
+            template: { mode: "builtin", value: "meta-default" },
+            routing: { ruleProviders: [], rules: [] },
+            transforms: { filterRegex: "", replacements: [] },
+            options: {
+              sort: "nameasc",
+              refresh: false,
+              nodeList: false,
+              userAgent: "",
+              useUDP: false
+            }
+          }
+        })
+      },
+      env
+    );
+    const link = await linkResponse.json();
+
+    const first = await app.request(`https://app.example.com/s/${link.id}`, {}, env);
+    expect(first.headers.get("cache-control")).toBe("public, s-maxage=300");
+
+    const second = await app.request(`https://app.example.com/s/${link.id}`, {}, env);
+    expect(second.status).toBe(200);
+    expect(second.headers.get("cache-control")).toBe("public, s-maxage=300");
+    expect(await second.text()).toContain("EdgeNode");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
     vi.unstubAllGlobals();
   });
 });

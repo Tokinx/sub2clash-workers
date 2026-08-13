@@ -1,8 +1,7 @@
 import YAML from "yaml";
 
 import { getLink } from "../data/link-repository.js";
-import { syncLinkCacheDependencies } from "../data/cache-dependencies.js";
-import { getCachedLinkOutput, putCachedLinkOutput } from "../data/link-output-cache.js";
+import { getCachedLinkOutput } from "../data/link-output-cache.js";
 import { fetchSubscription, getCachedSubscription, putCachedSubscription } from "../data/subscription-cache.js";
 import { findCustomTemplate } from "../data/settings-repository.js";
 import { decodeBase64UrlText } from "../utils/base64url.js";
@@ -577,14 +576,18 @@ async function renderLinkData(env, request, id, context) {
 }
 
 export async function renderLink(env, request, id, context) {
-  const record = await getLink(env, id);
-  const shouldUseCache = record.config?.options?.refresh !== true && !context;
-  if (shouldUseCache) {
+  // 顶层入口：先查输出缓存，命中直接返回（仅 1 次 KV 读）。
+  // 缓存中存在的条目必然来自可缓存链接（refresh: true 从不写缓存，
+  // 链接配置变更时 invalidateLinkCaches 已删除对应缓存），命中即安全。
+  if (!context) {
     const cached = await getCachedLinkOutput(env, id);
     if (cached) {
       return cached;
     }
   }
+
+  const record = await getLink(env, id);
+  const cacheable = record.config?.options?.refresh !== true;
 
   const renderContext = createRenderContext(context);
   const result = await renderConfigData(env, request, record.config, renderContext);
@@ -594,14 +597,15 @@ export async function renderLink(env, request, id, context) {
     ...metadata
   };
 
-  if (shouldUseCache) {
-    await syncLinkCacheDependencies(env, id, {
+  // 返回依赖信息与可缓存标志，由路由层决定是否回写缓存
+  // （写入移至 waitUntil，不在请求热路径内阻塞）。
+  return {
+    ...rendered,
+    cacheable,
+    dependencies: {
       sources: [...renderContext.externalSourceHashes],
       templates: [...renderContext.customTemplateIds],
       children: [...renderContext.childLinkIds]
-    });
-    await putCachedLinkOutput(env, id, rendered);
-  }
-
-  return rendered;
+    }
+  };
 }
