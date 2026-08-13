@@ -1,7 +1,7 @@
 import YAML from "yaml";
 
 import { decodeBase64Loose } from "../../utils/base64url.js";
-import { badRequest } from "../../utils/errors.js";
+import { AppError, badRequest } from "../../utils/errors.js";
 
 const SUPPORT_MATRIX = {
   clash: new Set(["ss", "ssr", "vmess", "trojan", "socks5"]),
@@ -630,8 +630,16 @@ function parseProxyLines(sourceText, options, maxProxies) {
     const line = sourceText.slice(start, end).replace(/\r$/, "").trim();
 
     if (line && isProxyLink(line)) {
-      proxies.push(parseProxyLink(line, options));
-      assertProxyCount(proxies.length, maxProxies);
+      try {
+        proxies.push(parseProxyLink(line, options));
+        assertProxyCount(proxies.length, maxProxies);
+      } catch (error) {
+        // 单行节点格式错误时跳过该行：上游订阅混入坏节点很常见，
+        // 不应让一个坏节点毁掉整个订阅；仅全局节点上限是必须强制的业务错误
+        if (error instanceof AppError && error.message.startsWith("节点数量不能超过")) {
+          throw error;
+        }
+      }
     }
 
     if (newlineIndex === -1) {

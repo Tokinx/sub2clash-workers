@@ -519,6 +519,10 @@ describe("worker api", () => {
     expect(oversized.status).toBe(400);
     expect((await oversized.json()).error).toContain("过长");
 
+    const invalid = await app.request("https://app.example.com/sub/!!!not-base64!!!", {}, env);
+    expect(invalid.status).toBe(400);
+    expect((await invalid.json()).error).toContain("无效");
+
     const config = {
       target: "meta",
       sources: { subscriptions: [], nodes: ["ss://YWVzLTI1Ni1nY206cGFzc0BleGFtcGxlLmNvbTo4NDQz#N"] },

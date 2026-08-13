@@ -33,7 +33,8 @@ describe("session", () => {
       status: 401
     });
 
-    const badSignature = `${signature.slice(0, -1)}A`;
+    const flipped = signature[signature.length - 1] === "A" ? "B" : "A";
+    const badSignature = `${signature.slice(0, -1)}${flipped}`;
     await expect(verifySessionToken(`${payload}.${badSignature}`, env)).rejects.toMatchObject({
       status: 401
     });

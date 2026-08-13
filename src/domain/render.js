@@ -151,10 +151,19 @@ async function resolveLocalSubscription(env, request, subscriptionUrl, context) 
   if (localTarget.type === "short") {
     context.childLinkIds.add(localTarget.id);
   }
-  const result =
-    localTarget.type === "short"
-      ? await renderLinkData(env, localRequest, localTarget.id, context)
-      : await renderConfigData(env, localRequest, JSON.parse(decodeBase64UrlText(localTarget.payload)), context);
+
+  let result;
+  if (localTarget.type === "short") {
+    result = await renderLinkData(env, localRequest, localTarget.id, context);
+  } else {
+    let localConfig;
+    try {
+      localConfig = JSON.parse(decodeBase64UrlText(localTarget.payload));
+    } catch {
+      throw badRequest("订阅参数无效");
+    }
+    result = await renderConfigData(env, localRequest, localConfig, context);
+  }
 
   return {
     proxies: Array.isArray(result.output.proxies) ? result.output.proxies : [],
@@ -214,7 +223,12 @@ function applyFilterAndReplace(proxies, config) {
     } catch (error) {
       throw badRequest("filterRegex 非法", error instanceof Error ? error.message : String(error));
     }
-    next = next.filter((proxy) => !regex.test(proxy.name));
+    // 重置 lastIndex：用户 pattern 带 g 标志时 test() 依赖 lastIndex 状态，
+    // 不重置会隔一个跳一个地误过滤节点
+    next = next.filter((proxy) => {
+      regex.lastIndex = 0;
+      return !regex.test(proxy.name);
+    });
   }
 
   for (const replacement of config.transforms.replacements.filter((item) => item.enabled)) {
@@ -570,7 +584,8 @@ export async function renderConfig(env, request, inputConfig, context) {
   const result = await renderConfigData(env, request, inputConfig, context);
   const { output, ...metadata } = result;
   return {
-    yaml: YAML.stringify(output),
+    // lineWidth: 0 禁止 YAML 折行，长节点名/URL 保持单行，输出更紧凑
+    yaml: YAML.stringify(output, { lineWidth: 0 }),
     ...metadata
   };
 }
@@ -598,7 +613,7 @@ export async function renderLink(env, request, id, context) {
   const result = await renderConfigData(env, request, record.config, renderContext);
   const { output, ...metadata } = result;
   const rendered = {
-    yaml: YAML.stringify(output),
+    yaml: YAML.stringify(output, { lineWidth: 0 }),
     ...metadata
   };
 

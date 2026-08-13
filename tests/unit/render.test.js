@@ -961,4 +961,32 @@ rules:
     });
     expect(subscriptionCache.fetchSubscription).not.toHaveBeenCalled();
   });
+
+  it("filterRegex 过滤不受 lastIndex 状态影响，模式含字面特殊字符时行为一致", async () => {
+    const env = createEnv();
+    const result = await renderConfig(
+      env,
+      new Request("https://app.example.com/"),
+      createConfig({
+        sources: {
+          subscriptions: [],
+          nodes: [
+            "ss://YWVzLTI1Ni1nY206cGFzc0BleGFtcGxlLmNvbTo4NDQz#香港A",
+            "ss://YWVzLTI1Ni1nY206cGFzc0BleGFtcGxlLmNvbTo4NDQz#日本B",
+            "ss://YWVzLTI1Ni1nY206cGFzc0BleGFtcGxlLmNvbTo4NDQz#香港C"
+          ]
+        },
+        transforms: {
+          filterRegex: "香港|日本g",
+          replacements: []
+        }
+      })
+    );
+
+    // 模式含字面 g 字符（非标志）：只匹配"香港"与"日本g"字样，
+    // 香港两节点被过滤、日本B 保留，行为稳定不出现隔一漏一
+    expect(result.yaml).not.toContain("香港A");
+    expect(result.yaml).not.toContain("香港C");
+    expect(result.yaml).toContain("日本B");
+  });
 });

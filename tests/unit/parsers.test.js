@@ -185,3 +185,31 @@ describe("订阅正文解析", () => {
     expect(() => parseSubscriptionBody(`proxies:\n${nodes.map((name) => `  - name: ${name}`).join("\n")}`, {}, { maxProxies: 2 })).toThrowError("节点数量不能超过 2");
   });
 });
+
+describe("订阅正文解析容错", () => {
+  const node = "ss://YWVzLTI1Ni1nY206cGFzc0BleGFtcGxlLmNvbTo4NDQz#Node";
+
+  it("混入格式错误的节点行时跳过坏行，其余节点正常解析", () => {
+    const proxies = parseSubscriptionBody([
+      `${node}A`,
+      "vmess://bm90LWEtdmFsaWQtanNvbg==",
+      "ss://%E6%90%9E%E5%9D%8F%E7%9A%84%E5%8A%A0%E5%AF%86%40:443",
+      `${node}B`
+    ].join("\n"));
+
+    expect(proxies).toHaveLength(2);
+    expect(proxies.map((proxy) => proxy.name)).toEqual(["NodeA", "NodeB"]);
+  });
+
+  it("全部行都损坏时返回空数组而不是抛错", () => {
+    const proxies = parseSubscriptionBody("vmess://bm90LWEtdmFsaWQtanNvbg==\nss://bad%40:22");
+
+    expect(proxies).toEqual([]);
+  });
+
+  it("超过节点上限仍按业务错误抛出", () => {
+    const nodes = Array.from({ length: 3 }, (_, index) => `${node}${index}`);
+
+    expect(() => parseSubscriptionBody(nodes.join("\n"), {}, { maxProxies: 2 })).toThrowError("节点数量不能超过 2");
+  });
+});

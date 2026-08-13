@@ -54,7 +54,12 @@ app.get("/sub/:payload", async (c) => {
   if (payload.length > MAX_SUB_PAYLOAD_BYTES) {
     throw badRequest("订阅参数过长");
   }
-  const config = JSON.parse(decodeBase64UrlText(payload));
+  let config;
+  try {
+    config = JSON.parse(decodeBase64UrlText(payload));
+  } catch {
+    throw badRequest("订阅参数无效");
+  }
   const result = await renderConfig(c.env, c.req.raw, config);
   if (result.subscriptionUserinfo) {
     c.header("subscription-userinfo", result.subscriptionUserinfo);
