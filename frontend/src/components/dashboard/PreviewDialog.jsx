@@ -9,7 +9,7 @@ import { Separator } from "@/components/ui/separator";
 function PreviewStat({ label, value }) {
   return (
     <Card className="border-[var(--dark-border)] bg-[rgba(250,249,245,0.04)] shadow-none">
-      <CardContent className="space-y-2 p-4">
+      <CardContent className="space-y-2 !p-4">
         <p className="text-[0.68rem] uppercase tracking-[0.16em] text-[var(--silver)]">{label}</p>
         <p className="font-display text-[1.45rem] leading-none text-[var(--paper-soft)]">{value}</p>
       </CardContent>
@@ -45,33 +45,35 @@ export default function PreviewDialog({
             </div>
           ) : null}
 
-          <div className="mt-4 space-y-3">
-            {subscriptionInfo ? (
-              <Alert className="border-[var(--dark-border)] bg-[rgba(250,249,245,0.04)] text-[var(--silver)]">
-                <AlertDescription>subscription-userinfo: {subscriptionInfo}</AlertDescription>
-              </Alert>
-            ) : null}
+          {warnings.length > 0 || subscriptionInfo || previewError ? (
+            <div className="mt-4 space-y-3">
+              {subscriptionInfo ? (
+                <Alert className="border-[var(--dark-border)] bg-[rgba(250,249,245,0.04)] text-[var(--silver)]">
+                  <AlertDescription>subscription-userinfo: {subscriptionInfo}</AlertDescription>
+                </Alert>
+              ) : null}
 
-            {warnings.length ? (
-              <Alert className="border-[var(--dark-border)] bg-[rgba(250,249,245,0.04)] text-[var(--silver)]">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>
-                  <ul className="list-disc space-y-1 pl-3">
-                    {warnings.map((warning) => (
-                      <li key={warning}>{warning}</li>
-                    ))}
-                  </ul>
-                </AlertDescription>
-              </Alert>
-            ) : null}
+              {warnings.length ? (
+                <Alert className="border-[var(--dark-border)] bg-[rgba(250,249,245,0.04)] text-[var(--silver)]">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    <ul className="list-disc space-y-1 pl-3">
+                      {warnings.map((warning) => (
+                        <li key={warning}>{warning}</li>
+                      ))}
+                    </ul>
+                  </AlertDescription>
+                </Alert>
+              ) : null}
 
-            {previewError ? (
-              <Alert variant="destructive" className="text-[#ffe9e1] [&>svg]:text-[#ffe9e1]">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{previewError}</AlertDescription>
-              </Alert>
-            ) : null}
-          </div>
+              {previewError ? (
+                <Alert variant="destructive" className="text-[#ffe9e1] [&>svg]:text-[#ffe9e1]">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{previewError}</AlertDescription>
+                </Alert>
+              ) : null}
+            </div>
+          ) : null}
         </div>
 
         <Separator className="bg-[var(--dark-border)]" />
@@ -83,9 +85,9 @@ export default function PreviewDialog({
               <span>正在渲染最新配置...</span>
             </div>
           ) : (
-            <ScrollArea className="h-[24rem] bg-[rgba(0,0,0,0.16)]">
+            <div className="h-[24rem] bg-[rgba(0,0,0,0.16)] overflow-auto">
               <pre className="m-0 p-4 text-xs leading-6 text-[var(--paper-soft)]">{preview || ""}</pre>
-            </ScrollArea>
+            </div>
           )}
         </div>
       </DialogContent>
