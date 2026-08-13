@@ -1,12 +1,22 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 
 import Shell from "./components/Shell.jsx";
 import { useSession } from "./hooks/useSession.js";
 import { apiFetch } from "./lib/api.js";
-import LoginPage from "./pages/LoginPage.jsx";
-import DashboardPage from "./pages/DashboardPage.jsx";
-import TemplatesPage from "./pages/TemplatesPage.jsx";
+
+// 页面级代码分割：登录页与编辑器按需加载，首屏不背负 dashboard 重依赖（cmdk/radix）
+const LoginPage = lazy(() => import("./pages/LoginPage.jsx"));
+const DashboardPage = lazy(() => import("./pages/DashboardPage.jsx"));
+const TemplatesPage = lazy(() => import("./pages/TemplatesPage.jsx"));
+
+function PageFallback() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-[var(--paper)] text-muted-foreground">
+      正在加载...
+    </div>
+  );
+}
 
 export default function App() {
   const session = useSession();
@@ -36,30 +46,36 @@ export default function App() {
   }
 
   if (!session.authenticated) {
-    return <LoginPage onAuthenticated={session.refresh} />;
+    return (
+      <Suspense fallback={<PageFallback />}>
+        <LoginPage onAuthenticated={session.refresh} />
+      </Suspense>
+    );
   }
 
   return (
     <Shell>
-      <Routes>
-        <Route
-          path="/"
-          element={<DashboardPage templates={templates} />}
-        />
-        <Route
-          path="/templates"
-          element={
-            <TemplatesPage
-              templates={templates}
-              refreshTemplates={refreshTemplates}
-            />
-          }
-        />
-        <Route
-          path="*"
-          element={<Navigate to="/" replace />}
-        />
-      </Routes>
+      <Suspense fallback={<PageFallback />}>
+        <Routes>
+          <Route
+            path="/"
+            element={<DashboardPage templates={templates} />}
+          />
+          <Route
+            path="/templates"
+            element={
+              <TemplatesPage
+                templates={templates}
+                refreshTemplates={refreshTemplates}
+              />
+            }
+          />
+          <Route
+            path="*"
+            element={<Navigate to="/" replace />}
+          />
+        </Routes>
+      </Suspense>
     </Shell>
   );
 }
