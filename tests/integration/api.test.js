@@ -1,11 +1,17 @@
 import { describe, expect, it, vi } from "vitest";
 
-import app from "../../src/index.js";
+import worker from "../../src/index.js";
 import { encodeBase64UrlText } from "../../src/utils/base64url.js";
 import { createEnv } from "../helpers/env.js";
 
+// module worker 入口：env 之后需传 ExecutionContext；测试无 exports 环境时
+// 走订阅输出兜底路径（不经过 Workers Caching 缓存层）
+function callWorker(url, init = {}, env) {
+  return worker.fetch(new Request(url, init), env, undefined);
+}
+
 async function login(env) {
-  const response = await app.request(
+  const response = await callWorker(
     "https://app.example.com/api/auth/login",
     {
       method: "POST",
@@ -22,10 +28,10 @@ async function login(env) {
 describe("worker api", () => {
   it("未登录访问受保护接口返回 401", async () => {
     const env = createEnv();
-    const response = await app.request("https://app.example.com/api/templates", {}, env);
+    const response = await callWorker("https://app.example.com/api/templates", {}, env);
     expect(response.status).toBe(401);
 
-    const refreshResponse = await app.request(
+    const refreshResponse = await callWorker(
       "https://app.example.com/api/subscriptions/refresh",
       {
         method: "POST",
@@ -40,7 +46,7 @@ describe("worker api", () => {
   it("拒绝通过手动刷新接口处理同域订阅", async () => {
     const env = createEnv();
     const cookie = await login(env);
-    const response = await app.request(
+    const response = await callWorker(
       "https://app.example.com/api/subscriptions/refresh",
       {
         method: "POST",
@@ -61,7 +67,7 @@ describe("worker api", () => {
 
     const cookie = await login(env);
 
-    const templateResponse = await app.request(
+    const templateResponse = await callWorker(
       "https://app.example.com/api/templates",
       {
         method: "POST",
@@ -81,7 +87,7 @@ describe("worker api", () => {
     expect(templateResponse.status).toBe(201);
     const createdTemplate = await templateResponse.json();
 
-    const linkResponse = await app.request(
+    const linkResponse = await callWorker(
       "https://app.example.com/api/links",
       {
         method: "POST",
@@ -138,7 +144,7 @@ describe("worker api", () => {
     expect(link.id).toHaveLength(20);
     expect(link.remark).toBe("家庭设备主订阅");
 
-    const linksResponse = await app.request(
+    const linksResponse = await callWorker(
       "https://app.example.com/api/links",
       {
         headers: { cookie }
@@ -159,7 +165,7 @@ describe("worker api", () => {
     );
     expect(linksData.links[0]).not.toHaveProperty("config");
 
-    const updateLinkResponse = await app.request(
+    const updateLinkResponse = await callWorker(
       `https://app.example.com/api/links/${link.id}`,
       {
         method: "PUT",
@@ -174,7 +180,7 @@ describe("worker api", () => {
     expect(updateLinkResponse.status).toBe(200);
     expect((await updateLinkResponse.json()).remark).toBe("平板备用订阅");
 
-    const invalidRemarkResponse = await app.request(
+    const invalidRemarkResponse = await callWorker(
       "https://app.example.com/api/links",
       {
         method: "POST",
@@ -188,7 +194,7 @@ describe("worker api", () => {
     );
     expect(invalidRemarkResponse.status).toBe(400);
 
-    const renderApiResponse = await app.request(
+    const renderApiResponse = await callWorker(
       "https://app.example.com/api/render",
       {
         method: "POST",
@@ -238,7 +244,7 @@ describe("worker api", () => {
     const renderData = await renderApiResponse.json();
     expect(renderData.yaml).toContain("mixed-port: 9091");
 
-    const renderResponse = await app.request(
+    const renderResponse = await callWorker(
       "https://app.example.com/s/" + link.id,
       {},
       env
@@ -269,7 +275,7 @@ describe("worker api", () => {
       );
     vi.stubGlobal("fetch", fetchMock);
 
-    const linkResponse = await app.request(
+    const linkResponse = await callWorker(
       "https://app.example.com/api/links",
       {
         method: "POST",
@@ -303,16 +309,16 @@ describe("worker api", () => {
     );
     const link = await linkResponse.json();
 
-    const first = await app.request(`https://app.example.com/s/${link.id}`, {}, env);
+    const first = await callWorker(`https://app.example.com/s/${link.id}`, {}, env);
     expect(await first.text()).toContain("OldNode");
     expect(first.headers.get("subscription-userinfo")).toContain("upload=1");
 
-    const second = await app.request(`https://app.example.com/s/${link.id}`, {}, env);
+    const second = await callWorker(`https://app.example.com/s/${link.id}`, {}, env);
     expect(await second.text()).toContain("OldNode");
     expect(second.headers.get("subscription-userinfo")).toContain("upload=1");
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
-    const refreshResponse = await app.request(
+    const refreshResponse = await callWorker(
       "https://app.example.com/api/subscriptions/refresh",
       {
         method: "POST",
@@ -325,7 +331,7 @@ describe("worker api", () => {
     expect(await refreshResponse.json()).toMatchObject({ ok: true, invalidatedLinkCount: 1 });
     expect(fetchMock.mock.calls[1][1]).toMatchObject({ cache: "no-store" });
 
-    const third = await app.request(`https://app.example.com/s/${link.id}`, {}, env);
+    const third = await callWorker(`https://app.example.com/s/${link.id}`, {}, env);
     expect(await third.text()).toContain("NewNode");
     expect(third.headers.get("subscription-userinfo")).toContain("upload=2");
     expect(fetchMock).toHaveBeenCalledTimes(2);
@@ -341,7 +347,7 @@ describe("worker api", () => {
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    const linkResponse = await app.request(
+    const linkResponse = await callWorker(
       "https://app.example.com/api/links",
       {
         method: "POST",
@@ -370,9 +376,9 @@ describe("worker api", () => {
     );
     const link = await linkResponse.json();
 
-    const first = await app.request(`https://app.example.com/s/${link.id}`, {}, env);
+    const first = await callWorker(`https://app.example.com/s/${link.id}`, {}, env);
     expect(first.headers.get("cache-control")).toBe("no-store");
-    await app.request(`https://app.example.com/s/${link.id}`, {}, env);
+    await callWorker(`https://app.example.com/s/${link.id}`, {}, env);
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(await env.CACHE.get(`cache:link-yaml:${link.id}`)).toBeNull();
@@ -406,12 +412,12 @@ describe("worker api", () => {
     });
 
     const normalPayload = encodeBase64UrlText(JSON.stringify(buildConfig(false)));
-    const normal = await app.request(`https://app.example.com/sub/${normalPayload}`, {}, env);
+    const normal = await callWorker(`https://app.example.com/sub/${normalPayload}`, {}, env);
     expect(normal.status).toBe(200);
     expect(normal.headers.get("cache-control")).toBe("public, s-maxage=21600");
 
     const refreshPayload = encodeBase64UrlText(JSON.stringify(buildConfig(true)));
-    const refresh = await app.request(`https://app.example.com/sub/${refreshPayload}`, {}, env);
+    const refresh = await callWorker(`https://app.example.com/sub/${refreshPayload}`, {}, env);
     expect(refresh.status).toBe(200);
     expect(refresh.headers.get("cache-control")).toBe("no-store");
 
@@ -426,7 +432,7 @@ describe("worker api", () => {
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    const linkResponse = await app.request(
+    const linkResponse = await callWorker(
       "https://app.example.com/api/links",
       {
         method: "POST",
@@ -456,10 +462,10 @@ describe("worker api", () => {
     );
     const link = await linkResponse.json();
 
-    const first = await app.request(`https://app.example.com/s/${link.id}`, {}, env);
+    const first = await callWorker(`https://app.example.com/s/${link.id}`, {}, env);
     expect(first.headers.get("cache-control")).toBe("public, s-maxage=300");
 
-    const second = await app.request(`https://app.example.com/s/${link.id}`, {}, env);
+    const second = await callWorker(`https://app.example.com/s/${link.id}`, {}, env);
     expect(second.status).toBe(200);
     expect(second.headers.get("cache-control")).toBe("public, s-maxage=300");
     expect(await second.text()).toContain("EdgeNode");
@@ -474,7 +480,7 @@ describe("worker api", () => {
     const attackerIp = "198.51.100.9";
 
     for (let attempt = 0; attempt < 10; attempt += 1) {
-      const response = await app.request(
+      const response = await callWorker(
         "https://app.example.com/api/auth/login",
         {
           method: "POST",
@@ -486,7 +492,7 @@ describe("worker api", () => {
       expect(response.status).toBe(401);
     }
 
-    const blocked = await app.request(
+    const blocked = await callWorker(
       "https://app.example.com/api/auth/login",
       {
         method: "POST",
@@ -498,7 +504,7 @@ describe("worker api", () => {
     expect(blocked.status).toBe(429);
 
     // 更换来源 IP 后计数独立，可正常登录
-    const otherIp = await app.request(
+    const otherIp = await callWorker(
       "https://app.example.com/api/auth/login",
       {
         method: "POST",
@@ -512,7 +518,7 @@ describe("worker api", () => {
 
   it("登录限速计数存放在 Cache API，不写入 KV", async () => {
     const env = createEnv();
-    await app.request(
+    await callWorker(
       "https://app.example.com/api/auth/login",
       {
         method: "POST",
@@ -529,7 +535,7 @@ describe("worker api", () => {
   it("超长订阅 payload 与超量规则被拒绝", async () => {
     const env = createEnv();
 
-    const oversized = await app.request(
+    const oversized = await callWorker(
       `https://app.example.com/sub/${"A".repeat(33 * 1024)}`,
       {},
       env
@@ -537,7 +543,7 @@ describe("worker api", () => {
     expect(oversized.status).toBe(400);
     expect((await oversized.json()).error).toContain("过长");
 
-    const invalid = await app.request("https://app.example.com/sub/!!!not-base64!!!", {}, env);
+    const invalid = await callWorker("https://app.example.com/sub/!!!not-base64!!!", {}, env);
     expect(invalid.status).toBe(400);
     expect((await invalid.json()).error).toContain("无效");
 
@@ -554,7 +560,7 @@ describe("worker api", () => {
       transforms: { filterRegex: "", replacements: [] },
       options: { sort: "nameasc" }
     };
-    const tooManyRules = await app.request(
+    const tooManyRules = await callWorker(
       `https://app.example.com/sub/${encodeBase64UrlText(JSON.stringify(config))}`,
       {},
       env
@@ -566,7 +572,7 @@ describe("worker api", () => {
   it("未知 API 路径返回 404 JSON，API 响应不缓存", async () => {
     const env = createEnv();
     const cookie = await login(env);
-    const response = await app.request(
+    const response = await callWorker(
       "https://app.example.com/api/not-exist",
       { headers: { cookie } },
       env
@@ -574,5 +580,40 @@ describe("worker api", () => {
     expect(response.status).toBe(404);
     expect(response.headers.get("cache-control")).toBe("no-store");
     expect((await response.json()).error).toBe("接口不存在");
+  });
+});
+
+describe("订阅输出缓存入口", () => {
+  it("SubscriptionEntrypoint 分发链路输出 Cache-Tag 与边缘缓存头", async () => {
+    const { SELF, env: testEnv } = await import("cloudflare:test");
+
+    const linkId = "entrypoint-link";
+    await testEnv.CACHE.put(
+      `link:${linkId}`,
+      JSON.stringify({
+        id: linkId,
+        remark: "",
+        config: {
+          target: "meta",
+          sources: {
+            subscriptions: [],
+            nodes: ["ss://YWVzLTI1Ni1nY206cGFzc0BleGFtcGxlLmNvbTo4NDQz#入口节点"]
+          },
+          template: { mode: "builtin", value: "meta-default" },
+          routing: { ruleProviders: [], rules: [] },
+          transforms: { filterRegex: "", replacements: [] },
+          options: { sort: "nameasc", refresh: false, nodeList: false, userAgent: "", useUDP: false }
+        },
+        createdAt: "2026-08-13T00:00:00.000Z",
+        updatedAt: "2026-08-13T00:00:00.000Z"
+      })
+    );
+
+    const response = await SELF.fetch(`https://app.example.com/s/${linkId}`);
+    expect(response.status).toBe(200);
+    expect(await response.text()).toContain("入口节点");
+    // Cache-Tag 由缓存入口设置，供管理台变更时 purge 精确失效
+    expect(response.headers.get("cache-tag")).toBe(`link:${linkId}`);
+    expect(response.headers.get("cache-control")).toBe("public, s-maxage=300");
   });
 });

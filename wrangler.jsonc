@@ -2,7 +2,24 @@
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "sub2clash-workers",
   "main": "./src/index.js",
-  "compatibility_date": "2025-09-06",
+  "compatibility_date": "2026-07-06",
+  "cache": {
+    "enabled": true
+  },
+  "exports": {
+    "default": {
+      "type": "worker",
+      "cache": {
+        "enabled": false
+      }
+    },
+    "SubscriptionEntrypoint": {
+      "type": "worker",
+      "cache": {
+        "enabled": true
+      }
+    }
+  },
   "observability": {
     "enabled": true
   },
