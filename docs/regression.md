@@ -706,3 +706,28 @@
   - 边缘缓存命中期间 `subscription-userinfo` 流量统计头最长滞后 6 小时（`/sub/:payload`）
   - wrangler v4.13 schema 不支持 assets 自定义 `cache_control`，hashed 资源缓存沿用 Assets 默认 ETag/条件请求
   - 登录限速计数为 KV 键（`rate:login:{ip}`），带 TTL 自动过期，不占用永久存储
+
+## Workers Caching 缓存层回归 2026-08-13
+
+- 状态：已完成
+- 目标：将订阅输出接入 Workers Caching 缓存层，管理台变更可即时失效边缘缓存
+- 变更：
+  - 升级 wrangler 4.122 / vitest 4 / vitest-pool-workers 0.21（vitest.config 迁移到 cloudflareTest() 插件）
+  - 新增 SubscriptionEntrypoint（cache.enabled=true）承载 /s/ 与 /sub/ 输出，命中缓存时 Worker 不执行；default 入口保持 gateway 语义并转发订阅路径，无 exports 环境走内联兜底
+  - /s/:id 与 /sub/:payload 边缘缓存 TTL 统一为 21600 秒；响应携带 Cache-Tag（link:{id}）
+  - 更新/删除短链、更新/删除模板、订阅手动刷新后，按失效 link id 经 purgeByTags RPC 精确清除 Workers Caching 条目，改配置即时生效
+  - 登录限速计数迁移到独立 Cache API 命名空间 caches.open("sub2clash:ratelimit")
+  - 部署自动冷缓存：Worker 版本是缓存 key 的一部分，发版后旧缓存自动失效
+- 测试：
+  - `bun run test:worker`
+  - `bun run test:frontend`
+  - `bun run test`
+  - `bun run build`
+- 结果：
+  - Worker 侧 8 个测试文件、98 个用例通过（新增：缓存入口分发链路、失效 id 返回、purge RPC 调用）
+  - 前端 7 个测试文件、25 个用例通过
+  - 前端生产构建成功
+- 现存风险：
+  - Workers Caching 为较新能力，生产行为（缓存命中、purge、部署冷缓存）需部署后通过 cf-cache-status 与 Observability 实测验证
+  - purge 使用 zone purge API 的速率限制体系，管理操作频率极低，实际不会触限
+  - vitest 4 已知噪音：miniflare isolate 内被正确断言的 rejection 仍报告 unhandled（cloudflare/workers-sdk#14736），不影响断言正确性

@@ -29,9 +29,10 @@
 - 长链接 `/sub/:payload` 与管理台 `/api/render` 不缓存最终 YAML；仅 `/s/:id` 在 `options.refresh = false` 时读写最终 YAML 缓存
 - 订阅输出同时使用 Cloudflare 边缘缓存（HTTP `Cache-Control`）与 KV 两层：
   - `/sub/:payload` 响应 `public, s-maxage=21600`：payload 即配置指纹，URL 变化即新缓存条目，无失效问题
-  - `/s/:id` 响应 `public, s-maxage=300`：链接配置可被修改，短 TTL 兜底，精确失效仍由 KV 的 `invalidateLinkCaches` 承担
+  - `/s/:id` 响应 `public, s-maxage=21600`：链接配置可被修改，管理台变更时按 `Cache-Tag` 调用 `ctx.cache.purge()` 精确失效，改动即时生效；KV 的 `invalidateLinkCaches` 继续负责 KV 层失效
   - 任一端点 `options.refresh = true` 时响应 `no-store`，强制刷新语义不受边缘缓存影响
   - 边缘缓存命中时 Worker 完全不执行，轮询型订阅客户端的请求数、CPU 与 KV 读取同步下降
+  - 缓存层由 Workers Caching 承载（`cache.enabled` + `exports` 双入口）：default 入口关闭缓存作为 gateway，订阅输出转发到 `SubscriptionEntrypoint`（缓存开启），命中缓存时整个入口不执行；purge 按入口作用域隔离，管理台变更经 `purgeByTags` RPC 精确清除
 - 短链 YAML 缓存写入与依赖索引同步移至 `ExecutionContext.waitUntil` 后台执行，两者并行且失败不影响响应；命中路径只读输出缓存（1 次 KV 读），未命中才读短链记录
 - 管理台可单独刷新一个不同源的 HTTP/HTTPS 订阅；刷新使用 `no-store` 抓取，成功后覆盖订阅缓存，失败时保留旧值
 - 手动刷新外部订阅、更新或删除短链、更新或删除自建模板时，会从直接依赖开始递归清除所有父短链 YAML 缓存

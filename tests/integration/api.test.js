@@ -463,11 +463,11 @@ describe("worker api", () => {
     const link = await linkResponse.json();
 
     const first = await callWorker(`https://app.example.com/s/${link.id}`, {}, env);
-    expect(first.headers.get("cache-control")).toBe("public, s-maxage=300");
+    expect(first.headers.get("cache-control")).toBe("public, s-maxage=21600");
 
     const second = await callWorker(`https://app.example.com/s/${link.id}`, {}, env);
     expect(second.status).toBe(200);
-    expect(second.headers.get("cache-control")).toBe("public, s-maxage=300");
+    expect(second.headers.get("cache-control")).toBe("public, s-maxage=21600");
     expect(await second.text()).toContain("EdgeNode");
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
@@ -614,6 +614,6 @@ describe("订阅输出缓存入口", () => {
     expect(await response.text()).toContain("入口节点");
     // Cache-Tag 由缓存入口设置，供管理台变更时 purge 精确失效
     expect(response.headers.get("cache-tag")).toBe(`link:${linkId}`);
-    expect(response.headers.get("cache-control")).toBe("public, s-maxage=300");
+    expect(response.headers.get("cache-control")).toBe("public, s-maxage=21600");
   });
 });

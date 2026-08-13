@@ -6,8 +6,9 @@ import { renderConfig, renderLink } from "./render.js";
 
 // /sub/:payload 的 payload 即配置指纹：URL 变化即新缓存条目，边缘缓存可放心用长 TTL
 const LONG_PAYLOAD_EDGE_TTL_SECONDS = 21_600;
-// /s/:id 的链接配置可被修改：purge 精确失效就位前保持短 TTL 兜底
-const SHORT_LINK_EDGE_TTL_SECONDS = 300;
+// /s/:id 同样使用长 TTL：管理台变更链接/模板/订阅时通过 Cache-Tag purge
+// 精确失效，改配置即时生效，不再依赖短 TTL 窗口
+const SHORT_LINK_EDGE_TTL_SECONDS = 21_600;
 // base64url 解码前限制原始 payload 长度，防未认证 CPU DoS
 const MAX_SUB_PAYLOAD_BYTES = 32 * 1024;
 

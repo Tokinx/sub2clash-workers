@@ -38,7 +38,7 @@
 - 单次渲染默认最多处理 100 个输入节点，由 `MAX_PROXY_COUNT` 调整；远程订阅、内联节点、同域订阅及模板/覆写最终结果均受此限制
 - `options.refresh = true` 会绕过远程订阅和短链 YAML KV 缓存，且不写回缓存
 - `/sub/:payload` 与 `POST /api/render` 不缓存最终 YAML；`/s/:id` 在非强制刷新模式下缓存最终 YAML
-- 订阅输出响应带边缘缓存头：`/sub/:payload` 为 `public, s-maxage=21600`，`/s/:id` 为 `public, s-maxage=300`；`options.refresh = true` 时两者均为 `no-store`
+- 订阅输出响应带边缘缓存头：`/sub/:payload` 为 `public, s-maxage=21600`，`/s/:id` 为 `public, s-maxage=21600`（管理台变更链接/模板/订阅时按 Cache-Tag purge 即时失效）；`options.refresh = true` 时两者均为 `no-store`
 - 长链接 payload 上限 32KB；`routing.rules` ≤ 50、`routing.ruleProviders` ≤ 20、`transforms.replacements` ≤ 50、`override.content` ≤ 64KB、`filterRegex` ≤ 1KB，超出返回 `400`
 
 ## 订阅缓存
