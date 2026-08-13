@@ -470,13 +470,15 @@ describe("worker api", () => {
 
   it("登录连续失败触发限速，成功登录清除计数", async () => {
     const env = createEnv();
+    // 使用独立测试 IP，避免失败计数污染同文件其他测试（vitest 4 按文件隔离存储）
+    const attackerIp = "198.51.100.9";
 
     for (let attempt = 0; attempt < 10; attempt += 1) {
       const response = await app.request(
         "https://app.example.com/api/auth/login",
         {
           method: "POST",
-          headers: { "content-type": "application/json" },
+          headers: { "content-type": "application/json", "cf-connecting-ip": attackerIp },
           body: JSON.stringify({ password: "wrong-password" })
         },
         env
@@ -488,7 +490,7 @@ describe("worker api", () => {
       "https://app.example.com/api/auth/login",
       {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", "cf-connecting-ip": attackerIp },
         body: JSON.stringify({ password: "test-password" })
       },
       env

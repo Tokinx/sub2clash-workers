@@ -30,8 +30,8 @@
     "yaml": "^2.8.0"
   },
   "devDependencies": {
-    "@cloudflare/vitest-pool-workers": "^0.8.32",
-    "vitest": "^3.2.4",
-    "wrangler": "^4.13.2"
+    "@cloudflare/vitest-pool-workers": "^0.21.2",
+    "vitest": "^4.1.0",
+    "wrangler": "^4.122.0"
   }
 }
