@@ -20,6 +20,8 @@ function clone(value) {
 
 const DEFAULT_MAX_PROXY_COUNT = 100;
 const DEFAULT_MAX_SUBSCRIPTION_COUNT = 10;
+// 订阅源并发抓取上限：并发降低首字节延迟，同时避免同时打满上游
+const SUBSCRIPTION_FETCH_CONCURRENCY = 4;
 
 function getPositiveInteger(value, fallback) {
   const parsed = Number(value);
@@ -447,12 +449,9 @@ function mergeTemplate(templateContent, proxies, countryGroups, config) {
 }
 
 async function collectRemoteProxies(env, request, config, context, limits) {
-  const result = [];
-  let subscriptionUserinfo = "";
   const subscriptions = config.sources.subscriptions.filter((item) => item.enabled);
 
-  for (let index = 0; index < subscriptions.length; index += 1) {
-    const subscription = subscriptions[index];
+  async function collectOne(subscription) {
     const hash = await sha256Hex(subscription.url);
     const localTarget = resolveLocalSubscriptionTarget(request, subscription.url);
 
@@ -476,23 +475,29 @@ async function collectRemoteProxies(env, request, config, context, limits) {
       }
     }
 
-    const remaining = limits.maxProxyCount - result.length - config.sources.nodes.length;
     const proxies = Array.isArray(payload.proxies)
       ? payload.proxies
-      : parseSubscriptionBody(payload.body, config.options, {
-          maxProxies: remaining
-        });
-    assertProxyCount(proxies.length, remaining);
-    result.push(...proxies);
-
-    if (index === 0 && subscriptions.length === 1) {
-      subscriptionUserinfo = payload.subscriptionUserinfo || "";
-    }
+      : parseSubscriptionBody(payload.body, config.options, {});
+    return {
+      proxies,
+      subscriptionUserinfo: payload.subscriptionUserinfo || ""
+    };
   }
 
+  // 限并发分批收集订阅，避免大量订阅源串行等待网络 RTT；
+  // 各源解析不再按剩余额度分别限制，统一在收集完成后校验总上限
+  const collected = [];
+  for (let start = 0; start < subscriptions.length; start += SUBSCRIPTION_FETCH_CONCURRENCY) {
+    const batch = subscriptions.slice(start, start + SUBSCRIPTION_FETCH_CONCURRENCY);
+    collected.push(...(await Promise.all(batch.map((subscription) => collectOne(subscription)))));
+  }
+
+  const proxies = collected.flatMap((item) => item.proxies);
+  assertProxyCount(proxies.length, limits.maxProxyCount - config.sources.nodes.length);
+
   return {
-    proxies: result,
-    subscriptionUserinfo
+    proxies,
+    subscriptionUserinfo: subscriptions.length === 1 ? collected[0]?.subscriptionUserinfo || "" : ""
   };
 }
 

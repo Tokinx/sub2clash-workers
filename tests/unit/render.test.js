@@ -104,6 +104,45 @@ describe("renderConfig", () => {
     expect(result.stats.proxyCount).toBe(2);
   });
 
+  it("多个订阅源按并发上限分批抓取并合并结果", async () => {
+    const env = createEnv();
+    let active = 0;
+    let maxActive = 0;
+    let counter = 0;
+    vi.spyOn(subscriptionCache, "fetchSubscription").mockImplementation(async () => {
+      active += 1;
+      maxActive = Math.max(maxActive, active);
+      const id = ++counter;
+      await new Promise((resolve) => setTimeout(resolve, 15));
+      active -= 1;
+      return {
+        body: `ss://YWVzLTI1Ni1nY206cGFzc0BleGFtcGxlLmNvbTo4NDQz#Node${id}`,
+        subscriptionUserinfo: ""
+      };
+    });
+
+    const result = await renderConfig(
+      env,
+      new Request("https://app.example.com/"),
+      createConfig({
+        sources: {
+          subscriptions: Array.from({ length: 6 }, (_, index) => ({
+            url: `https://sub.example.com/${index}`,
+            remark: `源${index}`
+          })),
+          nodes: []
+        }
+      })
+    );
+
+    // 确有并发（非串行），且不超过并发上限 4
+    expect(maxActive).toBeGreaterThan(1);
+    expect(maxActive).toBeLessThanOrEqual(4);
+    expect(result.stats.proxyCount).toBe(6);
+    expect(result.yaml).toContain("Node1");
+    expect(result.yaml).toContain("Node6");
+  });
+
   it("关闭的表格行会保留在配置中但在执行时全部跳过", async () => {
     const env = createEnv({ MAX_SUBSCRIPTION_COUNT: "1" });
     const result = await renderConfig(
