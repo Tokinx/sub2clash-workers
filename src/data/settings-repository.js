@@ -111,9 +111,9 @@ export async function updateTemplate(env, id, payload) {
     content: payload.content,
     updatedAt: new Date().toISOString()
   };
-  await invalidateLinksByTemplate(env, id);
+  const invalidatedIds = await invalidateLinksByTemplate(env, id);
   await saveSettings(env, settings);
-  return settings.templates[index];
+  return { template: settings.templates[index], invalidatedIds };
 }
 
 export async function deleteTemplate(env, id) {
@@ -122,9 +122,10 @@ export async function deleteTemplate(env, id) {
   if (index === -1) {
     throw notFound("模板不存在");
   }
-  await invalidateLinksByTemplate(env, id);
+  const invalidatedIds = await invalidateLinksByTemplate(env, id);
   settings.templates.splice(index, 1);
   await saveSettings(env, settings);
+  return invalidatedIds;
 }
 
 export async function duplicateTemplate(env, id) {

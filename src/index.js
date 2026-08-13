@@ -58,6 +58,13 @@ export class SubscriptionEntrypoint extends WorkerEntrypoint {
   fetch(request) {
     return dispatchSubscriptionRequest(this.env, this.ctx, request);
   }
+
+  // RPC 方法（绕过缓存层）：在缓存入口作用域内按标签清除缓存条目，
+  // 供管理台变更链接/模板/订阅后精确失效，不受 TTL 窗口影响
+  async purgeByTags(tags) {
+    const result = await this.ctx.cache.purge({ tags });
+    return result.success;
+  }
 }
 
 // 默认入口（gateway）：Workers Caching 关闭，所有逻辑每次执行。

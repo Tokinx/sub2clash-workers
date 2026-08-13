@@ -22,6 +22,20 @@ function writeCacheInBackground(ctx, tasks) {
   return work;
 }
 
+// 管理台变更后按 link 标签 purge Workers Caching 条目：
+// purge 按 entrypoint 作用域隔离，须经 SubscriptionEntrypoint 的 RPC 调用；
+// 无 exports 环境（测试）时静默跳过
+export async function purgeSubscriptionCache(ctx, linkIds) {
+  const ids = Array.isArray(linkIds) ? linkIds.filter(Boolean) : [];
+  if (ids.length === 0) {
+    return;
+  }
+  const entrypoint = ctx?.exports?.SubscriptionEntrypoint;
+  if (entrypoint?.purgeByTags) {
+    await entrypoint.purgeByTags(ids.map((id) => `link:${id}`));
+  }
+}
+
 // 订阅输出统一入口：由 Workers Caching 缓存入口（SubscriptionEntrypoint）与
 // 无 exports 环境（测试）的兜底路径共用。命中 Workers Caching 时整个入口不执行。
 export async function handleSubscriptionRequest(env, ctx, request) {

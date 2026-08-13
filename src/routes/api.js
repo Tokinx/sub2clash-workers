@@ -14,6 +14,7 @@ import {
 import { listBuiltinTemplates } from "../domain/builtin-templates.js";
 import { refreshExternalSubscription } from "../domain/cache.js";
 import { renderConfig } from "../domain/render.js";
+import { purgeSubscriptionCache } from "../domain/subscription-output.js";
 import { badRequest, tooManyRequests } from "../utils/errors.js";
 import { sha256Hex } from "../utils/crypto.js";
 
@@ -27,6 +28,12 @@ function sleep(ms) {
 
 function getClientIp(c) {
   return c.req.header("cf-connecting-ip") || "unknown";
+}
+
+// Hono 测试环境无 ExecutionContext（c.executionCtx getter 会抛错），
+// 从 env.context 读取真实运行时的 ExecutionContext
+function getExecutionContext(c) {
+  return c.env?.context ?? c.env?.ctx;
 }
 
 // 登录限速计数存放在独立 Cache API 命名空间而非 KV：
@@ -126,6 +133,8 @@ export function createApiRouter() {
   protectedApi.post("/subscriptions/refresh", async (c) => {
     const body = await c.req.json();
     const result = await refreshExternalSubscription(c.env, c.req.raw, body);
+    // 同步清除受影响短链的 Workers Caching 边缘缓存条目
+    await purgeSubscriptionCache(getExecutionContext(c), result.invalidatedLinkIds);
     return c.json(result);
   });
 
@@ -150,12 +159,14 @@ export function createApiRouter() {
 
   protectedApi.put("/templates/:id", async (c) => {
     const body = await c.req.json();
-    const template = await updateTemplate(c.env, c.req.param("id"), body);
-    return c.json(template);
+    const result = await updateTemplate(c.env, c.req.param("id"), body);
+    await purgeSubscriptionCache(getExecutionContext(c), result.invalidatedIds);
+    return c.json(result.template);
   });
 
   protectedApi.delete("/templates/:id", async (c) => {
-    await deleteTemplate(c.env, c.req.param("id"));
+    const invalidatedIds = await deleteTemplate(c.env, c.req.param("id"));
+    await purgeSubscriptionCache(getExecutionContext(c), invalidatedIds);
     return c.json({ ok: true });
   });
 
@@ -177,12 +188,14 @@ export function createApiRouter() {
 
   protectedApi.put("/links/:id", async (c) => {
     const body = await c.req.json();
-    const link = await updateLink(c.env, c.req.param("id"), body.config, body.remark);
-    return c.json(link);
+    const result = await updateLink(c.env, c.req.param("id"), body.config, body.remark);
+    await purgeSubscriptionCache(getExecutionContext(c), result.invalidatedIds);
+    return c.json(result.record);
   });
 
   protectedApi.delete("/links/:id", async (c) => {
-    await deleteLink(c.env, c.req.param("id"));
+    const invalidatedIds = await deleteLink(c.env, c.req.param("id"));
+    await purgeSubscriptionCache(getExecutionContext(c), invalidatedIds);
     return c.json({ ok: true });
   });
 

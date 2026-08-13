@@ -26,10 +26,11 @@ export async function refreshExternalSubscription(env, request, input = {}) {
   await refreshCachedSubscription(env, hash, url, {
     userAgent: typeof input.userAgent === "string" ? input.userAgent : ""
   });
-  const invalidatedLinks = await invalidateLinksBySource(env, hash);
+  const invalidatedLinkIds = await invalidateLinksBySource(env, hash);
 
   return {
     ok: true,
-    invalidatedLinkCount: invalidatedLinks.length
+    invalidatedLinkCount: invalidatedLinkIds.length,
+    invalidatedLinkIds
   };
 }

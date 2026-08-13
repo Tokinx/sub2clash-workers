@@ -100,15 +100,16 @@ export async function updateLink(env, id, config, remark) {
     config,
     updatedAt: new Date().toISOString()
   };
-  await invalidateLinkCaches(env, [id]);
+  const invalidatedIds = await invalidateLinkCaches(env, [id]);
   await removeLinkCacheDependencies(env, id);
   await putLinkRecord(env, nextRecord);
-  return nextRecord;
+  return { record: nextRecord, invalidatedIds };
 }
 
 export async function deleteLink(env, id) {
   await getLink(env, id);
-  await invalidateLinkCaches(env, [id]);
+  const invalidatedIds = await invalidateLinkCaches(env, [id]);
   await removeLinkCacheDependencies(env, id);
   await env.CACHE.delete(buildLinkKey(id));
+  return invalidatedIds;
 }
