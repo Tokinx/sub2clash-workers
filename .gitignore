@@ -8,3 +8,4 @@ bun.lock
 wrangler.local.jsonc
 .tasks/0.next.md
 .zcode
+.mimosa

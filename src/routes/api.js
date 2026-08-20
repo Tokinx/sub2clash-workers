@@ -30,10 +30,17 @@ function getClientIp(c) {
   return c.req.header("cf-connecting-ip") || "unknown";
 }
 
-// Hono 测试环境无 ExecutionContext（c.executionCtx getter 会抛错），
-// 从 env.context 读取真实运行时的 ExecutionContext
+// 从 Hono Context 读取真实运行时的 ExecutionContext：index.js 通过
+// app.fetch(request, env, ctx) 传入，路由处理器经 c.executionCtx 可取到。
+// 注意 c.env 只是绑定对象，并不携带 ExecutionContext；测试环境直接
+// app.request() 未传 ExecutionContext 时该 getter 会抛错，此时返回
+// undefined，purgeSubscriptionCache 据此静默跳过（与既有行为一致）。
 function getExecutionContext(c) {
-  return c.env?.context ?? c.env?.ctx;
+  try {
+    return c.executionCtx;
+  } catch {
+    return undefined;
+  }
 }
 
 // 登录限速计数存放在独立 Cache API 命名空间而非 KV：

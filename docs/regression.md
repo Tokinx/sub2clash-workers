@@ -1,5 +1,23 @@
 # 回归记录
 
+## 短链边缘缓存 purge 失效修复 2026-08-20
+
+- 状态：已完成
+- 目标：修复管理台“更新短链接”等变更后 `/s/:id` 边缘缓存始终命中（约 6 小时不翻新）的问题
+- 变更：
+  - `src/routes/api.js` 的 `getExecutionContext` 原从 `c.env.context / c.env.ctx` 读取 ExecutionContext，而 `env` 只是绑定对象并不携带，导致真实运行时 ctx 恒为 `undefined`，`purgeSubscriptionCache` 静默跳过，Workers Caching 的 Cache-Tag 精确失效从未触发
+  - 改为经 `c.executionCtx` 读取 `index.js` 通过 `app.fetch(request, env, ctx)` 传入的真实 ExecutionContext；测试环境未传 ExecutionContext 时该 getter 抛错，`try/catch` 后返回 `undefined`，purge 继续静默跳过（与既有行为一致）
+  - 新增集成回归用例：`PUT /api/links/:id` 后按 `link:{id}` 标签调用缓存入口 RPC purge
+  - 文档同步补充 purge 依赖 `ctx.exports` 回环绑定与 `c.executionCtx` 的说明
+- 测试：
+  - `bun run test:worker`
+  - `git diff --check`
+- 结果：
+  - Worker 侧 8 个测试文件、99 个用例通过（含新增 “更新短链后经缓存入口 RPC purge 对应 Cache-Tag” 用例）
+  - 差异格式检查通过
+- 现存风险：
+  - purge 依赖 `ctx.exports`（compatibility date 2026-07-06 起默认开启）与 Workers Caching 的 Cache-Tag 标签精确失效；若将来降低兼容日期需显式开启该开关，否则 purge 会静默跳过
+
 ## 订阅源与短链 YAML 长时缓存回归 2026-07-15
 
 - 状态：已完成

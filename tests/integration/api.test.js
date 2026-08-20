@@ -5,9 +5,10 @@ import { encodeBase64UrlText } from "../../src/utils/base64url.js";
 import { createEnv } from "../helpers/env.js";
 
 // module worker 入口：env 之后需传 ExecutionContext；测试无 exports 环境时
-// 走订阅输出兜底路径（不经过 Workers Caching 缓存层）
-function callWorker(url, init = {}, env) {
-  return worker.fetch(new Request(url, init), env, undefined);
+// 走订阅输出兜底路径（不经过 Workers Caching 缓存层）。传入带 exports 的
+// ctx 可模拟真实运行时的缓存入口 RPC，用于验证管理台变更后的 purge 链路
+function callWorker(url, init = {}, env, ctx = undefined) {
+  return worker.fetch(new Request(url, init), env, ctx);
 }
 
 async function login(env) {
@@ -337,6 +338,53 @@ describe("worker api", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
 
     vi.unstubAllGlobals();
+  });
+
+  it("更新短链后经缓存入口 RPC purge 对应 Cache-Tag", async () => {
+    const env = createEnv();
+    const cookie = await login(env);
+
+    const linkResponse = await callWorker(
+      "https://app.example.com/api/links",
+      {
+        method: "POST",
+        headers: { cookie, "content-type": "application/json" },
+        body: JSON.stringify({
+          remark: "purge 测试",
+          config: {
+            target: "meta",
+            sources: {
+              subscriptions: [],
+              nodes: ["ss://YWVzLTI1Ni1nY206cGFzc0BleGFtcGxlLmNvbTo4NDQz#PurgeNode"]
+            },
+            template: { mode: "builtin", value: "meta-default" },
+            routing: { ruleProviders: [], rules: [] },
+            transforms: { filterRegex: "", replacements: [] },
+            options: { sort: "nameasc", refresh: false, nodeList: false, userAgent: "", useUDP: false }
+          }
+        })
+      },
+      env
+    );
+    const link = await linkResponse.json();
+
+    const purgeByTags = vi.fn(async () => true);
+    const ctx = { exports: { SubscriptionEntrypoint: { purgeByTags } } };
+
+    const updateResponse = await callWorker(
+      `https://app.example.com/api/links/${link.id}`,
+      {
+        method: "PUT",
+        headers: { cookie, "content-type": "application/json" },
+        body: JSON.stringify({ config: link.config, remark: "已更新" })
+      },
+      env,
+      ctx
+    );
+    expect(updateResponse.status).toBe(200);
+    // 真实运行时由 index.js 的 fetch 传入 ExecutionContext，路由层
+    // 经 c.executionCtx 取到后调用缓存入口 RPC 精确失效边缘缓存条目
+    expect(purgeByTags).toHaveBeenCalledWith([`link:${link.id}`]);
   });
 
   it("短链开启强制刷新后不会读取或写入最终 YAML 缓存", async () => {
