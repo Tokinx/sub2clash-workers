@@ -3,49 +3,30 @@ allow-lan: true
 mode: Rule
 log-level: info
 ipv6: true
+tcp-concurrent: true
+unified-delay: true
 proxies: []
 proxy-groups:
   - name: 节点选择
     type: select
     proxies:
       - <countries>
-      - 手动切换
-      - DIRECT
-  - name: 手动切换
-    type: select
-    proxies:
       - <all>
-  - name: OpenAI
-    type: select
-    proxies:
-      - 节点选择
-      - <countries>
-      - 手动切换
-      - DIRECT
-  - name: 国外媒体
-    type: select
-    proxies:
-      - 节点选择
-      - <countries>
-      - 手动切换
-      - DIRECT
-  - name: Telegram
-    type: select
-    proxies:
-      - 节点选择
-      - <countries>
-      - 手动切换
-      - DIRECT
-  - name: 漏网之鱼
-    type: select
-    proxies:
-      - 节点选择
-      - <countries>
-      - 手动切换
       - DIRECT
 rules:
-  - GEOSITE,openai,OpenAI
-  - GEOSITE,telegram,Telegram
-  - GEOSITE,geolocation-!cn,国外媒体
+  - GEOSITE,private,DIRECT
   - GEOIP,private,DIRECT
-  - MATCH,漏网之鱼
+  - IP-CIDR,127.0.0.1/8,DIRECT,no-resolve
+  - IP-CIDR,10.0.0.0/8,DIRECT,no-resolve
+  - IP-CIDR,172.16.0.0/12,DIRECT,no-resolve
+  - IP-CIDR,192.168.0.0/16,DIRECT,no-resolve
+  - IP-CIDR,100.64.0.0/10,DIRECT,no-resolve
+  - IP-CIDR,224.0.0.0/4,DIRECT,no-resolve
+  - IP-CIDR,255.255.255.255/32,DIRECT,no-resolve
+  - IP-CIDR6,::1/128,DIRECT,no-resolve
+  - IP-CIDR6,fc00::/7,DIRECT,no-resolve
+  - IP-CIDR6,fe80::/10,DIRECT,no-resolve
+  - GEOSITE,geolocation-!cn,节点选择
+  - GEOSITE,cn,DIRECT
+  - GEOIP,CN,DIRECT
+  - MATCH,节点选择

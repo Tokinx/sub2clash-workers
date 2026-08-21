@@ -8,7 +8,8 @@
   - **存储与领域层**：
     - `settings` KV 结构支持 `builtinOverrides: {}`，存储内置模板的自定义覆写内容
     - `src/data/settings-repository.js` 新增 `getBuiltinOverrides`、`getBuiltinOverride`、`updateBuiltinTemplate`、`resetBuiltinTemplate`，并支持直接派生复制内置模板
-    - `src/domain/builtin-templates.js` 支持合并返回 `isModified: true/false` 与覆写内容；`loadBuiltinTemplate` 优先使用用户覆写
+    - `src/domain/builtin-templates.js` 支持合并返回 `isModified: true/false` 与覆写内容；`loadBuiltinTemplate` 优先使用用户覆写；精简为单一「节点选择」核心策略组（包含 `<countries>`、`<all>`、`DIRECT`），非大陆规则（`geolocation-!cn`）与全局兜底（`MATCH`）全部统一路由至「节点选择」；默认规则调整为内网全网段（含广播/组播/私有域名）置顶直连、默认 CN 直连（`GEOSITE,cn,DIRECT` 与 `GEOIP,CN,DIRECT`），Meta 模板增加 `tcp-concurrent: true` 与 `unified-delay: true` 性能参数
+    - 同步更新 `public/templates/clash-default.yaml` 与 `public/templates/meta-default.yaml` 静态模板预设
     - `src/domain/render.js` 在 `loadTemplate` 中将内置模板 ID 同步加入依赖索引，修改或重置内置模板时自动失效关联短链缓存
   - **API 路由层**：
     - `GET /api/templates`：返回内置模板（含覆写与修改状态）和自建模板

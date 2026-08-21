@@ -8,43 +8,19 @@ proxy-groups:
     type: select
     proxies:
       - <countries>
-      - 手动切换
-      - DIRECT
-  - name: 手动切换
-    type: select
-    proxies:
       - <all>
-  - name: OpenAI
-    type: select
-    proxies:
-      - 节点选择
-      - <countries>
-      - 手动切换
-      - DIRECT
-  - name: 国外媒体
-    type: select
-    proxies:
-      - 节点选择
-      - <countries>
-      - 手动切换
-      - DIRECT
-  - name: Telegram
-    type: select
-    proxies:
-      - 节点选择
-      - <countries>
-      - 手动切换
-      - DIRECT
-  - name: 漏网之鱼
-    type: select
-    proxies:
-      - 节点选择
-      - <countries>
-      - 手动切换
       - DIRECT
 rules:
-  - DOMAIN-SUFFIX,openai.com,OpenAI
-  - DOMAIN-SUFFIX,chatgpt.com,OpenAI
-  - DOMAIN-SUFFIX,telegram.org,Telegram
   - GEOIP,LAN,DIRECT
-  - MATCH,漏网之鱼
+  - IP-CIDR,127.0.0.1/8,DIRECT,no-resolve
+  - IP-CIDR,10.0.0.0/8,DIRECT,no-resolve
+  - IP-CIDR,172.16.0.0/12,DIRECT,no-resolve
+  - IP-CIDR,192.168.0.0/16,DIRECT,no-resolve
+  - IP-CIDR,100.64.0.0/10,DIRECT,no-resolve
+  - IP-CIDR,224.0.0.0/4,DIRECT,no-resolve
+  - IP-CIDR,255.255.255.255/32,DIRECT,no-resolve
+  - IP-CIDR6,::1/128,DIRECT,no-resolve
+  - IP-CIDR6,fc00::/7,DIRECT,no-resolve
+  - IP-CIDR6,fe80::/10,DIRECT,no-resolve
+  - GEOIP,CN,DIRECT
+  - MATCH,节点选择
