@@ -8,10 +8,13 @@ import {
   createTemplate,
   deleteTemplate,
   duplicateTemplate,
+  getBuiltinOverrides,
   listCustomTemplates,
+  resetBuiltinTemplate,
+  updateBuiltinTemplate,
   updateTemplate
 } from "../data/settings-repository.js";
-import { listBuiltinTemplates } from "../domain/builtin-templates.js";
+import { BUILTIN_TEMPLATES, getRawBuiltinTemplate, listBuiltinTemplates } from "../domain/builtin-templates.js";
 import { refreshExternalSubscription } from "../domain/cache.js";
 import { renderConfig } from "../domain/render.js";
 import { purgeSubscriptionCache } from "../domain/subscription-output.js";
@@ -146,7 +149,8 @@ export function createApiRouter() {
   });
 
   protectedApi.get("/templates", async (c) => {
-    const builtin = listBuiltinTemplates();
+    const overrides = await getBuiltinOverrides(c.env);
+    const builtin = listBuiltinTemplates(overrides);
     const custom = await listCustomTemplates(c.env);
     return c.json({
       builtin,
@@ -165,14 +169,41 @@ export function createApiRouter() {
   });
 
   protectedApi.put("/templates/:id", async (c) => {
+    const id = c.req.param("id");
     const body = await c.req.json();
-    const result = await updateTemplate(c.env, c.req.param("id"), body);
+    const isBuiltin = BUILTIN_TEMPLATES.some((item) => item.id === id);
+    let result;
+    if (isBuiltin) {
+      result = await updateBuiltinTemplate(c.env, id, body);
+    } else {
+      result = await updateTemplate(c.env, id, body);
+    }
     await purgeSubscriptionCache(getExecutionContext(c), result.invalidatedIds);
     return c.json(result.template);
   });
 
+  protectedApi.post("/templates/:id/reset", async (c) => {
+    const id = c.req.param("id");
+    const isBuiltin = BUILTIN_TEMPLATES.some((item) => item.id === id);
+    if (!isBuiltin) {
+      throw badRequest("仅内置模板支持恢复默认");
+    }
+    const invalidatedIds = await resetBuiltinTemplate(c.env, id);
+    await purgeSubscriptionCache(getExecutionContext(c), invalidatedIds);
+    const rawTemplate = getRawBuiltinTemplate(id);
+    return c.json({
+      ...rawTemplate,
+      isModified: false
+    });
+  });
+
   protectedApi.delete("/templates/:id", async (c) => {
-    const invalidatedIds = await deleteTemplate(c.env, c.req.param("id"));
+    const id = c.req.param("id");
+    const isBuiltin = BUILTIN_TEMPLATES.some((item) => item.id === id);
+    if (isBuiltin) {
+      throw badRequest("内置模板不能删除");
+    }
+    const invalidatedIds = await deleteTemplate(c.env, id);
     await purgeSubscriptionCache(getExecutionContext(c), invalidatedIds);
     return c.json({ ok: true });
   });

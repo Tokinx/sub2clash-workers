@@ -617,6 +617,66 @@ describe("worker api", () => {
     expect((await tooManyRules.json()).error).toContain("规则数量");
   });
 
+  it("支持直接覆写内置模板并在修改后一键重置为默认值", async () => {
+    const env = createEnv();
+    const cookie = await login(env);
+
+    // 1. 获取初始模板列表，builtin 包含 isModified: false
+    const listRes1 = await callWorker("https://app.example.com/api/templates", { headers: { cookie } }, env);
+    expect(listRes1.status).toBe(200);
+    const data1 = await listRes1.json();
+    const metaTpl = data1.builtin.find((item) => item.id === "meta-default");
+    expect(metaTpl.isModified).toBe(false);
+    expect(metaTpl.content).toContain("mixed-port: 7890");
+
+    // 2. 覆写内置模板
+    const putRes = await callWorker(
+      "https://app.example.com/api/templates/meta-default",
+      {
+        method: "PUT",
+        headers: { cookie, "content-type": "application/json" },
+        body: JSON.stringify({
+          name: "自定义 Meta 默认模板",
+          target: "meta",
+          content: "mixed-port: 9999\nallow-lan: false\nproxies: []\nproxy-groups: []\nrules: []\n"
+        })
+      },
+      env
+    );
+    expect(putRes.status).toBe(200);
+    const updated = await putRes.json();
+    expect(updated.name).toBe("自定义 Meta 默认模板");
+    expect(updated.isModified).toBe(true);
+
+    // 3. 再次获取列表，确认 isModified 为 true 且内容已更新
+    const listRes2 = await callWorker("https://app.example.com/api/templates", { headers: { cookie } }, env);
+    const data2 = await listRes2.json();
+    const metaTpl2 = data2.builtin.find((item) => item.id === "meta-default");
+    expect(metaTpl2.isModified).toBe(true);
+    expect(metaTpl2.content).toContain("mixed-port: 9999");
+
+    // 4. 重置内置模板为默认
+    const resetRes = await callWorker(
+      "https://app.example.com/api/templates/meta-default/reset",
+      {
+        method: "POST",
+        headers: { cookie, "content-type": "application/json" }
+      },
+      env
+    );
+    expect(resetRes.status).toBe(200);
+    const resetData = await resetRes.json();
+    expect(resetData.isModified).toBe(false);
+    expect(resetData.content).toContain("mixed-port: 7890");
+
+    // 5. 再次获取列表，确认已完全恢复
+    const listRes3 = await callWorker("https://app.example.com/api/templates", { headers: { cookie } }, env);
+    const data3 = await listRes3.json();
+    const metaTpl3 = data3.builtin.find((item) => item.id === "meta-default");
+    expect(metaTpl3.isModified).toBe(false);
+    expect(metaTpl3.content).toContain("mixed-port: 7890");
+  });
+
   it("未知 API 路径返回 404 JSON，API 响应不缓存", async () => {
     const env = createEnv();
     const cookie = await login(env);

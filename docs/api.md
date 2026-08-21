@@ -10,10 +10,11 @@
 
 ## 模板
 
-- `GET /api/templates`
-- `POST /api/templates`
-- `PUT /api/templates/:id`
-- `DELETE /api/templates/:id`
+- `GET /api/templates`：返回内置模板（含 `isModified` 及用户覆写内容）与自建模板
+- `POST /api/templates`：创建自建模板或复制模板
+- `PUT /api/templates/:id`：更新自建模板或覆写内置模板（同步失效受影响短链缓存）
+- `DELETE /api/templates/:id`：删除自建模板（同步失效受影响短链缓存）
+- `POST /api/templates/:id/reset`：重置内置模板为出厂配置（清除覆写并同步失效受影响短链缓存）
 
 ## 配置转换
 

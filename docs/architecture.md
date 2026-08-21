@@ -17,7 +17,7 @@
 
 ## 存储模型
 
-- `settings`：全局设置与自建模板
+- `settings`：全局设置、自建模板列表与内置模板自定义覆写（`builtinOverrides`）
 - `link:{id}`：短链配置
 - `cache:sub:{hash}`：按订阅 URL 哈希保存的外部订阅内容，默认 TTL 为 6 小时
 - `cache:link-yaml:{id}`：短链接最终 YAML 与响应元数据，默认 TTL 与外部订阅一致

@@ -14,7 +14,8 @@ export function createDefaultSettings() {
       templateId: "meta-default",
       sort: "nameasc"
     },
-    templates: []
+    templates: [],
+    builtinOverrides: {}
   };
 }
 
@@ -29,7 +30,11 @@ function normalizeSettings(settings) {
       ...fallback.defaults,
       ...(settings.defaults || {})
     },
-    templates: Array.isArray(settings.templates) ? settings.templates : []
+    templates: Array.isArray(settings.templates) ? settings.templates : [],
+    builtinOverrides:
+      settings.builtinOverrides && typeof settings.builtinOverrides === "object"
+        ? settings.builtinOverrides
+        : {}
   };
 }
 
@@ -128,8 +133,63 @@ export async function deleteTemplate(env, id) {
   return invalidatedIds;
 }
 
+export async function getBuiltinOverrides(env) {
+  const settings = await getSettings(env);
+  return settings.builtinOverrides || {};
+}
+
+export async function getBuiltinOverride(env, id) {
+  const overrides = await getBuiltinOverrides(env);
+  return overrides[id] || null;
+}
+
+export async function updateBuiltinTemplate(env, id, payload) {
+  validateTemplatePayload(payload);
+  const settings = await getSettings(env);
+  settings.builtinOverrides = settings.builtinOverrides || {};
+  settings.builtinOverrides[id] = {
+    name: payload.name.trim(),
+    target: payload.target,
+    content: payload.content,
+    updatedAt: new Date().toISOString()
+  };
+  const invalidatedIds = await invalidateLinksByTemplate(env, id);
+  await saveSettings(env, settings);
+  return {
+    template: {
+      id,
+      name: settings.builtinOverrides[id].name,
+      target: settings.builtinOverrides[id].target,
+      content: settings.builtinOverrides[id].content,
+      builtin: true,
+      isModified: true,
+      updatedAt: settings.builtinOverrides[id].updatedAt
+    },
+    invalidatedIds
+  };
+}
+
+export async function resetBuiltinTemplate(env, id) {
+  const settings = await getSettings(env);
+  if (settings.builtinOverrides && settings.builtinOverrides[id]) {
+    delete settings.builtinOverrides[id];
+    const invalidatedIds = await invalidateLinksByTemplate(env, id);
+    await saveSettings(env, settings);
+    return invalidatedIds;
+  }
+  return [];
+}
+
 export async function duplicateTemplate(env, id) {
-  const template = await findCustomTemplate(env, id);
+  let template = await findCustomTemplate(env, id);
+  if (!template) {
+    const { loadBuiltinTemplate } = await import("../domain/builtin-templates.js");
+    try {
+      template = await loadBuiltinTemplate(env, null, id);
+    } catch {
+      template = null;
+    }
+  }
   if (!template) {
     throw notFound("模板不存在");
   }

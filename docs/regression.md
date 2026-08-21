@@ -1,6 +1,34 @@
 # 回归记录
 
-## 短链边缘缓存 purge 失效修复 2026-08-20
+## 模板编辑页面使用体验重构与默认模板可编辑/一键恢复 2026-08-21
+
+- 状态：已完成
+- 目标：重构模板编辑页为双栏 Master-Detail 布局，支持内置模板直接修改保存与一键恢复默认配置，增强等宽代码字体排版与底部非遮挡状态栏
+- 变更：
+  - **存储与领域层**：
+    - `settings` KV 结构支持 `builtinOverrides: {}`，存储内置模板的自定义覆写内容
+    - `src/data/settings-repository.js` 新增 `getBuiltinOverrides`、`getBuiltinOverride`、`updateBuiltinTemplate`、`resetBuiltinTemplate`，并支持直接派生复制内置模板
+    - `src/domain/builtin-templates.js` 支持合并返回 `isModified: true/false` 与覆写内容；`loadBuiltinTemplate` 优先使用用户覆写
+    - `src/domain/render.js` 在 `loadTemplate` 中将内置模板 ID 同步加入依赖索引，修改或重置内置模板时自动失效关联短链缓存
+  - **API 路由层**：
+    - `GET /api/templates`：返回内置模板（含覆写与修改状态）和自建模板
+    - `PUT /api/templates/:id`：支持内置模板与自建模板统一更新并触发缓存失效
+    - `POST /api/templates/:id/reset`：支持内置模板一键恢复为原生默认配置
+    - `DELETE /api/templates/:id`：禁止删除内置模板，安全保护
+  - **前端页面**：
+    - `TemplatesPage.jsx` 重构为响应式双栏工作台（左侧系统预设与自建模板列表导航，右侧主编辑区）
+    - 内置模板开放编辑并显示「系统预设（默认）」与「已自定义」状态，被修改后提供「恢复默认值」按钮
+    - 移除冗余的“基于此新建”按钮，移除全部 card shadow 保持纯扁平设计；移除顶部占位的页面标题；将“新建空白模板”按钮移至“自建模板”列表下方
+    - 模板编辑器采用 Anthropic Mono 等宽字体，直角扁平设计
+    - 底部集成状态栏，实时展示行数、大小统计、YAML 合法性检测与非阻塞提示信息，移除此前遮挡文字的悬浮 Alert
+- 测试：
+  - `cd frontend && bun run test`
+  - `bun run build:frontend`
+- 结果：
+  - 前端 7 个测试文件、25 个用例全部通过（含内置模板编辑/保存/重置与自建模板全流程测试）
+  - 前端生产打包构建成功（Vite 构建无报错）
+- 现存风险：
+  - 无重大风险，旧数据缺少 `builtinOverrides` 字段时自动初始化为空对象兼容处理。
 
 - 状态：已完成
 - 目标：修复管理台“更新短链接”等变更后 `/s/:id` 边缘缓存始终命中（约 6 小时不翻新）的问题

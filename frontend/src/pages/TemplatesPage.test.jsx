@@ -11,13 +11,31 @@ vi.mock("@/lib/api.js", () => ({
 }));
 
 const templates = {
-  builtin: [{ id: "meta-default", name: "内置模板", target: "meta", builtin: true }],
+  builtin: [
+    {
+      id: "meta-default",
+      name: "内置模板",
+      target: "meta",
+      builtin: true,
+      isModified: false,
+      content: "proxies: []\nproxy-groups: []\nrules: []\n"
+    },
+    {
+      id: "clash-default",
+      name: "Clash 内置",
+      target: "clash",
+      builtin: true,
+      isModified: true,
+      content: "proxies: []\n"
+    }
+  ],
   custom: [
     {
       id: "custom-1",
       name: "自建模板",
       target: "meta",
       builtin: false,
+      isModified: false,
       content: "proxies: []\nproxy-groups: []\nrules: []\n"
     }
   ]
@@ -28,18 +46,73 @@ describe("TemplatesPage", () => {
     vi.clearAllMocks();
   });
 
-  it("选择内置模板时会进入只读状态且不显示额外提示", async () => {
+  it("内置模板开放编辑并支持保存与恢复默认", async () => {
     const user = userEvent.setup();
+    const refreshTemplates = vi.fn();
 
-    renderWithRouter(<TemplatesPage templates={templates} refreshTemplates={vi.fn()} />);
+    apiFetch
+      .mockResolvedValueOnce({
+        id: "meta-default",
+        name: "内置模板修改版",
+        target: "meta",
+        content: "proxies: []\n",
+        builtin: true,
+        isModified: true
+      })
+      .mockResolvedValueOnce({
+        id: "clash-default",
+        name: "Clash 内置",
+        target: "clash",
+        builtin: true,
+        isModified: false,
+        content: "mixed-port: 7890\n"
+      });
 
+    renderWithRouter(<TemplatesPage templates={templates} refreshTemplates={refreshTemplates} />);
+
+    // 选择 meta-default 内置模板
     await user.click(screen.getByRole("button", { name: /内置模板/i }));
 
-    expect(screen.getByDisplayValue("内置模板")).toBeDisabled();
-    expect(screen.getByRole("button", { name: /保存模板/i })).toBeDisabled();
-    expect(screen.getByRole("button", { name: /格式化模板/i })).toBeDisabled();
-    expect(screen.getByRole("textbox", { name: /模板内容/i })).toHaveAttribute("readonly");
-    expect(screen.queryByText(/当前选择的是内置模板/)).not.toBeInTheDocument();
+    const nameInput = screen.getByDisplayValue("内置模板");
+    const editor = screen.getByRole("textbox", { name: /模板内容/i });
+
+    expect(nameInput).not.toBeDisabled();
+    expect(editor).not.toHaveAttribute("readonly");
+
+    await user.clear(nameInput);
+    await user.type(nameInput, "内置模板修改版");
+    await user.click(screen.getByRole("button", { name: /保存模板/i }));
+
+    await waitFor(() => {
+      expect(apiFetch).toHaveBeenNthCalledWith(
+        1,
+        "/api/templates/meta-default",
+        expect.objectContaining({
+          method: "PUT",
+          body: JSON.stringify({
+            name: "内置模板修改版",
+            target: "meta",
+            content: "proxies: []\nproxy-groups: []\nrules: []\n"
+          })
+        })
+      );
+    });
+
+    // 切换到已修改的 clash-default 内置模板
+    await user.click(screen.getByRole("button", { name: /Clash 内置/i }));
+    const resetButton = screen.getByRole("button", { name: /恢复默认/i });
+    expect(resetButton).toBeInTheDocument();
+
+    await user.click(resetButton);
+    await waitFor(() => {
+      expect(apiFetch).toHaveBeenNthCalledWith(
+        2,
+        "/api/templates/clash-default/reset",
+        expect.objectContaining({
+          method: "POST"
+        })
+      );
+    });
   });
 
   it("可以格式化、保存、复制并删除自建模板", async () => {
@@ -87,8 +160,11 @@ describe("TemplatesPage", () => {
       );
     });
 
-    await user.click(screen.getByRole("button", { name: "复制" }));
-    await user.click(screen.getByRole("button", { name: "删除" }));
+    const copyButtons = screen.getAllByRole("button", { name: "复制" });
+    await user.click(copyButtons[copyButtons.length - 1]);
+
+    const deleteButtons = screen.getAllByRole("button", { name: "删除" });
+    await user.click(deleteButtons[0]);
 
     expect(apiFetch).toHaveBeenNthCalledWith(
       2,

@@ -118,19 +118,53 @@ rules:
   }
 ];
 
-export function listBuiltinTemplates() {
-  return BUILTIN_TEMPLATES.map((template) => ({
-    id: template.id,
-    name: template.name,
-    target: template.target,
-    builtin: true
-  }));
+export function listBuiltinTemplates(builtinOverrides = {}) {
+  return BUILTIN_TEMPLATES.map((template) => {
+    const override = builtinOverrides[template.id];
+    if (override) {
+      return {
+        id: template.id,
+        name: override.name || template.name,
+        target: override.target || template.target,
+        builtin: true,
+        isModified: true,
+        content: override.content ?? template.content,
+        updatedAt: override.updatedAt
+      };
+    }
+    return {
+      id: template.id,
+      name: template.name,
+      target: template.target,
+      builtin: true,
+      isModified: false,
+      content: template.content
+    };
+  });
 }
 
-export async function loadBuiltinTemplate(_env, _request, id) {
+export function getRawBuiltinTemplate(id) {
   const template = BUILTIN_TEMPLATES.find((item) => item.id === id);
   if (!template) {
     throw notFound("内置模板不存在");
+  }
+  return template;
+}
+
+export async function loadBuiltinTemplate(env, _request, id) {
+  const template = getRawBuiltinTemplate(id);
+  if (env) {
+    const { getBuiltinOverride } = await import("../data/settings-repository.js");
+    const override = await getBuiltinOverride(env, id);
+    if (override) {
+      return {
+        ...template,
+        name: override.name || template.name,
+        target: override.target || template.target,
+        content: override.content ?? template.content,
+        isModified: true
+      };
+    }
   }
   return template;
 }

@@ -172,6 +172,7 @@ async function resolveLocalSubscription(env, request, subscriptionUrl, context) 
 }
 
 async function loadTemplate(env, request, config, context) {
+  context.customTemplateIds.add(config.template.value);
   if (config.template.mode === "builtin") {
     return loadBuiltinTemplate(env, request, config.template.value);
   }
@@ -180,7 +181,6 @@ async function loadTemplate(env, request, config, context) {
   if (!template) {
     throw notFound("自建模板不存在");
   }
-  context.customTemplateIds.add(config.template.value);
   return template;
 }
 
